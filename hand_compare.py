@@ -52,6 +52,14 @@ FINGER_JOINT_INDICES = {
     "Pinky":  [12, 13, 14],
 }
 
+ANGLE_TOLERANCE_DEG = 13.0
+OVERALL_SCORE_DECAY = 21.0
+FINGER_SCORE_DECAY = 17.0
+CONTACT_TOLERANCE = 0.09
+CONTACT_SCORE_DECAY = 0.11
+SPREAD_TOLERANCE = 0.08
+SPREAD_SCORE_DECAY = 0.11
+
 
 def normalize_landmarks(landmarks):
     """
@@ -105,6 +113,25 @@ def compute_finger_distances(landmarks):
     return np.array([np.linalg.norm(pts[t]) for t in tips])
 
 
+def compute_thumb_contact_profile(landmarks):
+    """Distances from thumb tip to the other fingertip targets."""
+    pts = normalize_landmarks(landmarks) if isinstance(landmarks[0], dict) else landmarks
+    targets = [INDEX_TIP, MIDDLE_TIP, RING_TIP, PINKY_TIP]
+    return np.array([np.linalg.norm(pts[THUMB_TIP] - pts[target]) for target in targets])
+
+
+def compute_spread_profile(landmarks):
+    """Simple lateral spread profile across the fingertips and palm."""
+    pts = normalize_landmarks(landmarks) if isinstance(landmarks[0], dict) else landmarks
+    spread_pairs = [
+        (INDEX_TIP, MIDDLE_TIP),
+        (MIDDLE_TIP, RING_TIP),
+        (RING_TIP, PINKY_TIP),
+        (INDEX_MCP, PINKY_MCP),
+    ]
+    return np.array([np.linalg.norm(pts[a] - pts[b]) for a, b in spread_pairs])
+
+
 def compare_hands(user_landmarks, ref_landmarks):
     """
     Compare user hand landmarks with reference landmarks.
@@ -120,18 +147,43 @@ def compare_hands(user_landmarks, ref_landmarks):
 
     # Angle differences (in degrees)
     angle_diffs_deg = np.abs(user_angles - ref_angles) * (180.0 / math.pi)
+    penalized_diffs = np.maximum(0.0, angle_diffs_deg - ANGLE_TOLERANCE_DEG)
 
-    # Overall score: exponential decay based on mean angle error
-    mean_error = np.mean(angle_diffs_deg)
-    overall_score = max(0, 100 * math.exp(-mean_error / 30.0))
+    # Angle score: allow small pose differences before penalizing accuracy.
+    mean_error = np.mean(penalized_diffs)
+    angle_score = max(0, 100 * math.exp(-mean_error / OVERALL_SCORE_DECAY))
+
+    user_contacts = compute_thumb_contact_profile(user_landmarks)
+    ref_contacts = compute_thumb_contact_profile(ref_landmarks)
+    contact_diffs = np.maximum(0.0, np.abs(user_contacts - ref_contacts) - CONTACT_TOLERANCE)
+    mean_contact_error = np.mean(contact_diffs)
+    contact_score = max(0, 100 * math.exp(-mean_contact_error / CONTACT_SCORE_DECAY))
+
+    user_spread = compute_spread_profile(user_landmarks)
+    ref_spread = compute_spread_profile(ref_landmarks)
+    spread_diffs = np.maximum(0.0, np.abs(user_spread - ref_spread) - SPREAD_TOLERANCE)
+    mean_spread_error = np.mean(spread_diffs)
+    spread_score = max(0, 100 * math.exp(-mean_spread_error / SPREAD_SCORE_DECAY))
+
+    overall_score = max(0, min(100, angle_score * 0.5 + contact_score * 0.35 + spread_score * 0.15))
 
     # Per-finger scores
     finger_scores = {}
     feedback = []
+    contact_index_map = {
+        "Thumb": [0, 1, 2, 3],
+        "Index": [0],
+        "Middle": [1],
+        "Ring": [2],
+        "Pinky": [3],
+    }
     for fname, joint_idxs in FINGER_JOINT_INDICES.items():
-        finger_errors = angle_diffs_deg[joint_idxs]
+        finger_errors = penalized_diffs[joint_idxs]
         finger_mean_error = np.mean(finger_errors)
-        score = max(0, 100 * math.exp(-finger_mean_error / 25.0))
+        finger_angle_score = max(0, 100 * math.exp(-finger_mean_error / FINGER_SCORE_DECAY))
+        finger_contact_error = np.mean(contact_diffs[contact_index_map[fname]])
+        finger_contact_score = max(0, 100 * math.exp(-finger_contact_error / CONTACT_SCORE_DECAY))
+        score = max(0, min(100, finger_angle_score * 0.72 + finger_contact_score * 0.28))
         finger_scores[fname] = round(score, 1)
 
         # Generate feedback
@@ -146,13 +198,15 @@ def compare_hands(user_landmarks, ref_landmarks):
         elif score < 75:
             feedback.append(f"Adjust your {fname} slightly")
 
-    # Also compare finger distances for spread detection
-    user_dists = compute_finger_distances(user_landmarks)
-    ref_dists = compute_finger_distances(ref_landmarks)
-    dist_diff = np.mean(np.abs(user_dists - ref_dists))
-
-    if dist_diff > 0.5:
-        if np.mean(user_dists) < np.mean(ref_dists):
+    strongest_contact_idx = int(np.argmax(contact_diffs))
+    if contact_diffs[strongest_contact_idx] > CONTACT_TOLERANCE * 1.6:
+        finger_label = ["Index", "Middle", "Ring", "Pinky"][strongest_contact_idx]
+        if user_contacts[strongest_contact_idx] > ref_contacts[strongest_contact_idx]:
+            feedback.insert(0, f"Move your thumb closer to your {finger_label.lower()} finger")
+        else:
+            feedback.insert(0, f"Move your thumb slightly away from your {finger_label.lower()} finger")
+    elif mean_spread_error > SPREAD_TOLERANCE * 0.8:
+        if np.mean(user_spread) < np.mean(ref_spread):
             feedback.append("Spread your fingers wider")
         else:
             feedback.append("Bring your fingers closer together")
@@ -162,6 +216,7 @@ def compare_hands(user_landmarks, ref_landmarks):
         "finger_scores": finger_scores,
         "feedback": feedback[:3],  # Limit to top 3 most important
         "mean_angle_error": round(mean_error, 1),
+        "mean_contact_error": round(mean_contact_error, 3),
     }
 
 
@@ -186,9 +241,15 @@ def find_best_matching_frame(user_landmarks, ref_frames):
         ref_lm = frame["hands"][0]["landmarks"]
         ref_angles = get_joint_angles(ref_lm)
 
-        # Quick angle similarity
-        angle_diff = np.mean(np.abs(user_angles - ref_angles) * (180.0 / math.pi))
-        score = max(0, 100 * math.exp(-angle_diff / 30.0))
+        # Quick similarity across angles and fingertip contact.
+        angle_diff = np.abs(user_angles - ref_angles) * (180.0 / math.pi)
+        penalized_diff = np.maximum(0.0, angle_diff - ANGLE_TOLERANCE_DEG)
+        angle_score = max(0, 100 * math.exp(-np.mean(penalized_diff) / OVERALL_SCORE_DECAY))
+        user_contacts = compute_thumb_contact_profile(user_landmarks)
+        ref_contacts = compute_thumb_contact_profile(ref_lm)
+        contact_diff = np.maximum(0.0, np.abs(user_contacts - ref_contacts) - CONTACT_TOLERANCE)
+        contact_score = max(0, 100 * math.exp(-np.mean(contact_diff) / CONTACT_SCORE_DECAY))
+        score = max(0, min(100, angle_score * 0.6 + contact_score * 0.4))
 
         if score > best_score:
             best_score = score

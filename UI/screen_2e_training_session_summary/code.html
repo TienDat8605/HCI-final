@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Session Summary - Blueprint Rehab</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary": "#00012e",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-container": "#6e79ff",
+                        "secondary-container": "#a5eff9",
+                        "on-tertiary": "#ffffff",
+                        "primary-container": "#101d42",
+                        "on-secondary-fixed-variant": "#004f56",
+                        "on-primary-container": "#7a85b0",
+                        "primary": "#00051e",
+                        "on-primary": "#ffffff",
+                        "surface-dim": "#d5dbe0",
+                        "error-container": "#ffdad6",
+                        "on-error": "#ffffff",
+                        "on-tertiary-fixed": "#00036b",
+                        "on-secondary-fixed": "#001f23",
+                        "surface-container-highest": "#dde3e9",
+                        "on-primary-fixed-variant": "#39456c",
+                        "secondary-fixed": "#a5eff9",
+                        "outline-variant": "#c6c6cf",
+                        "surface-container-low": "#eff4fa",
+                        "tertiary-container": "#000476",
+                        "secondary-fixed-dim": "#89d2dc",
+                        "surface-container": "#e9eef4",
+                        "surface-tint": "#515d85",
+                        "surface-bright": "#f5faff",
+                        "on-secondary": "#ffffff",
+                        "inverse-on-surface": "#ecf1f7",
+                        "error": "#ba1a1a",
+                        "tertiary-fixed-dim": "#bec2ff",
+                        "tertiary-fixed": "#e0e0ff",
+                        "on-surface-variant": "#45464e",
+                        "on-background": "#161c20",
+                        "outline": "#76767f",
+                        "primary-fixed-dim": "#b9c5f3",
+                        "on-tertiary-fixed-variant": "#1d28ce",
+                        "on-surface": "#161c20",
+                        "surface-variant": "#dde3e9",
+                        "on-secondary-container": "#1c6e77",
+                        "on-error-container": "#93000a",
+                        "surface": "#f5faff",
+                        "on-primary-fixed": "#0c193e",
+                        "surface-container-high": "#e3e9ef",
+                        "primary-fixed": "#dbe1ff",
+                        "background": "#f5faff",
+                        "inverse-surface": "#2b3136",
+                        "secondary": "#116871",
+                        "inverse-primary": "#b9c5f3"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3, .headline { font-family: 'Space Grotesk', sans-serif; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface flex flex-col min-h-screen">
+<!-- TopAppBar -->
+<header class="bg-[#f5faff] dark:bg-[#0D1317] flex justify-between items-center w-full px-6 h-16 fixed top-0 z-50">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold tracking-tighter text-[#00051e] dark:text-[#f5faff] uppercase font-['Space_Grotesk']">Blueprint Rehab</span>
+<nav class="hidden md:flex gap-6">
+<a class="text-[#76767f] dark:text-[#c6c6cf] hover:text-[#116871] transition-colors duration-200 font-['Space_Grotesk'] font-bold tracking-tight" href="#">Dashboard</a>
+<a class="text-[#00051e] dark:text-[#f5faff] font-bold border-b-2 border-[#116871] font-['Space_Grotesk'] tracking-tight" href="#">Active Session</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#76767f] cursor-pointer active:opacity-70">settings</span>
+<span class="material-symbols-outlined text-[#76767f] cursor-pointer active:opacity-70">account_circle</span>
+</div>
+</header>
+<div class="flex flex-1 pt-16">
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-16 bottom-0 flex flex-col z-40 bg-[#eff4fa] dark:bg-[#0D1317] h-full w-20 md:w-64 transition-transform duration-150 ease-in-out">
+<div class="p-6 hidden md:block">
+<h3 class="font-['Space_Grotesk'] font-bold text-primary uppercase text-xs tracking-widest">Rehab Portal</h3>
+<p class="text-secondary text-[10px] uppercase tracking-widest font-bold">Active Session</p>
+</div>
+<nav class="flex flex-col flex-1">
+<div class="px-2 md:px-0">
+<!-- Instruction Tab -->
+<a class="flex items-center gap-4 py-4 px-6 text-[#76767f] dark:text-[#c6c6cf] hover:bg-[#dde3e9] dark:hover:bg-[#101d42] transition-all" href="#">
+<span class="material-symbols-outlined">info</span>
+<span class="hidden md:block font-['Inter'] text-sm font-medium uppercase tracking-widest">Instructions</span>
+</a>
+<!-- Training Tab -->
+<a class="flex items-center gap-4 py-4 px-6 text-[#76767f] dark:text-[#c6c6cf] hover:bg-[#dde3e9] dark:hover:bg-[#101d42] transition-all" href="#">
+<span class="material-symbols-outlined">fitness_center</span>
+<span class="hidden md:block font-['Inter'] text-sm font-medium uppercase tracking-widest">Training</span>
+</a>
+<!-- Zones Tab -->
+<a class="flex items-center gap-4 py-4 px-6 text-[#76767f] dark:text-[#c6c6cf] hover:bg-[#dde3e9] dark:hover:bg-[#101d42] transition-all" href="#">
+<span class="material-symbols-outlined">grid_view</span>
+<span class="hidden md:block font-['Inter'] text-sm font-medium uppercase tracking-widest">Zones</span>
+</a>
+<!-- Pause Tab -->
+<a class="flex items-center gap-4 py-4 px-6 text-[#76767f] dark:text-[#c6c6cf] hover:bg-[#dde3e9] dark:hover:bg-[#101d42] transition-all" href="#">
+<span class="material-symbols-outlined">pause_circle</span>
+<span class="hidden md:block font-['Inter'] text-sm font-medium uppercase tracking-widest">Pause</span>
+</a>
+<!-- Summary Tab (ACTIVE) -->
+<a class="flex items-center gap-4 py-4 px-6 bg-[#89d2dc]/10 text-[#116871] dark:text-[#89d2dc] border-r-4 border-[#116871] transition-all" href="#">
+<span class="material-symbols-outlined">assignment</span>
+<span class="hidden md:block font-['Inter'] text-sm font-medium uppercase tracking-widest">Summary</span>
+</a>
+</div>
+</nav>
+<div class="p-4 border-t border-outline-variant/20 hidden md:block">
+<div class="flex items-center gap-3">
+<img alt="Patient Profile" class="w-10 h-10 bg-surface-container-highest" data-alt="minimalist user avatar placeholder with a geometric clean look in a slate and teal color palette" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAyvWOQK680J82zxeejjALfzaf90Nqr8wHPsu9m6jH5TcHTZJ479k_7TuDfMweIO3ZvPwI2AX5wECyA5ITazEblB6d9GA9qZwYLjVKR8Z8OW-WG1CTauUvGjvYgVgDFdCR9naUI-nU8er7AsgBXBSkTRcrfoqdV2AxonbTU9z5KkkNzR2ELMpiT1MW58bATG1vx3RKn_6Y0mqMwDFP18Z2XdmGYvLOVsNt3Ex0jTwUD_KyVXL-dRRzEAQkdn5gPBFWXOzLIh4sibC8i"/>
+<div>
+<p class="text-xs font-bold text-primary">J. ANDERSON</p>
+<p class="text-[10px] text-outline uppercase">Patient ID: 4402-B</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 ml-20 md:ml-64 p-8 bg-surface">
+<!-- Header Section -->
+<div class="mb-12">
+<div class="flex justify-between items-end border-b-2 border-primary pb-4">
+<div>
+<p class="text-secondary font-bold text-xs uppercase tracking-tighter mb-1">Performance Protocol v2.4</p>
+<h1 class="text-5xl font-['Space_Grotesk'] font-bold tracking-tighter text-primary">Session Summary</h1>
+</div>
+<div class="text-right">
+<p class="text-on-surface-variant font-medium text-sm">October 24, 2023</p>
+<p class="text-primary font-bold text-lg">REHAB_ID: 99120</p>
+</div>
+</div>
+</div>
+<!-- Bento Layout Summary Grid -->
+<div class="grid grid-cols-12 gap-6 items-stretch">
+<!-- Metrics Left Column -->
+<div class="col-span-12 lg:col-span-4 flex flex-col gap-6">
+<!-- Reps Card -->
+<div class="bg-surface-container-low p-6 flex flex-col justify-between border-l-4 border-primary h-full">
+<div class="flex justify-between items-start mb-8">
+<span class="text-xs font-bold uppercase tracking-widest text-outline">Reps Completed</span>
+<span class="material-symbols-outlined text-secondary">repeat</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-7xl font-headline font-bold text-primary">24</span>
+<span class="text-secondary font-bold text-lg uppercase">Total</span>
+</div>
+<div class="mt-4 pt-4 border-t border-outline-variant/30">
+<p class="text-[10px] text-outline uppercase font-medium">Goal: 25 | Variance: -4%</p>
+</div>
+</div>
+<!-- Accuracy Card -->
+<div class="bg-surface-container-low p-6 flex flex-col justify-between border-l-4 border-secondary h-full">
+<div class="flex justify-between items-start mb-8">
+<span class="text-xs font-bold uppercase tracking-widest text-outline">Average Accuracy</span>
+<span class="material-symbols-outlined text-secondary">target</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-7xl font-headline font-bold text-primary">850</span>
+<span class="text-secondary font-bold text-lg uppercase">pts</span>
+</div>
+<div class="mt-4 pt-4 border-t border-outline-variant/30">
+<div class="h-1 bg-surface-container-highest w-full relative">
+<div class="absolute top-0 left-0 h-full bg-secondary" style="width: 85%;"></div>
+</div>
+</div>
+</div>
+<!-- Time Card -->
+<div class="bg-surface-container-low p-6 flex flex-col justify-between border-l-4 border-outline h-full">
+<div class="flex justify-between items-start mb-8">
+<span class="text-xs font-bold uppercase tracking-widest text-outline">Total Time</span>
+<span class="material-symbols-outlined text-secondary">timer</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-7xl font-headline font-bold text-primary">12:45</span>
+<span class="text-secondary font-bold text-lg uppercase">m/s</span>
+</div>
+<div class="mt-4 pt-4 border-t border-outline-variant/30 text-[10px] text-outline uppercase">
+                            Session efficiency: High
+                        </div>
+</div>
+</div>
+<!-- Chart Right Column -->
+<div class="col-span-12 lg:col-span-8 bg-surface-container-highest p-8 relative flex flex-col">
+<div class="flex justify-between items-center mb-8">
+<div>
+<h2 class="text-xl font-headline font-bold text-primary uppercase">Stability &amp; Motion Tracking</h2>
+<p class="text-xs text-secondary font-medium uppercase tracking-widest">Post-Session Kinematic Analysis</p>
+</div>
+<div class="flex gap-4">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 bg-primary"></span>
+<span class="text-[10px] font-bold uppercase">Stability</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 bg-secondary"></span>
+<span class="text-[10px] font-bold uppercase">Accuracy</span>
+</div>
+</div>
+</div>
+<!-- Line Chart Visual Representation (CSS-based) -->
+<div class="flex-1 flex flex-col justify-end relative h-[400px] border-l-2 border-b-2 border-primary/20">
+<!-- Simulated Chart Grid Lines -->
+<div class="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10">
+<div class="border-t border-primary w-full"></div>
+<div class="border-t border-primary w-full"></div>
+<div class="border-t border-primary w-full"></div>
+<div class="border-t border-primary w-full"></div>
+<div class="border-t border-primary w-full"></div>
+</div>
+<!-- Simulated Line Path (using a stylized background or SVG) -->
+<svg class="absolute inset-0 w-full h-full" preserveaspectratio="none" viewbox="0 0 800 400">
+<!-- Motion Data Path -->
+<path d="M0,320 Q100,280 200,340 T400,250 T600,290 T800,200" fill="none" stroke="#00051e" stroke-width="4"></path>
+<!-- Stability Data Path -->
+<path d="M0,350 Q100,300 200,320 T400,200 T600,240 T800,150" fill="none" stroke="#116871" stroke-dasharray="8 4" stroke-width="3"></path>
+</svg>
+<!-- X-Axis Labels -->
+<div class="absolute bottom-[-24px] left-0 right-0 flex justify-between px-2">
+<span class="text-[9px] font-bold text-outline uppercase">Start</span>
+<span class="text-[9px] font-bold text-outline uppercase">05:00</span>
+<span class="text-[9px] font-bold text-outline uppercase">10:00</span>
+<span class="text-[9px] font-bold text-outline uppercase">End Session</span>
+</div>
+</div>
+<div class="mt-12 p-4 bg-white/40 border border-white/60 backdrop-blur-sm">
+<h4 class="text-xs font-bold text-primary uppercase mb-2">Architectural Assessment</h4>
+<p class="text-xs text-on-surface-variant leading-relaxed">The motion path shows a significant stabilization trend between minutes 06:00 and 09:00. Lateral drift was minimized compared to previous sessions. Recommended action: Increase resistance by 5% in next module.</p>
+</div>
+</div>
+</div>
+<!-- Focused Bottom Action Callout -->
+<div class="mt-12">
+<div class="bg-primary p-8 flex items-center justify-center gap-12 group cursor-pointer transition-colors duration-300 hover:bg-secondary">
+<div class="relative w-16 h-16 flex items-center justify-center">
+<div class="absolute inset-0 border-2 border-on-primary animate-ping opacity-20"></div>
+<span class="material-symbols-outlined text-on-primary text-4xl" style="font-variation-settings: 'FILL' 1;">front_hand</span>
+</div>
+<div>
+<h3 class="text-on-primary text-2xl font-headline font-bold uppercase tracking-tighter">Hold hand in center to return to menu</h3>
+<p class="text-secondary-fixed-dim text-xs uppercase tracking-[0.2em] font-medium mt-1">Automatic exit in 15 seconds if no action detected</p>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Background Blueprint Watermark (Decorative) -->
+<div class="fixed bottom-0 right-0 pointer-events-none opacity-[0.03] p-12">
+<svg fill="none" height="400" viewbox="0 0 100 100" width="400" xmlns="http://www.w3.org/2000/svg">
+<rect height="80" stroke="currentColor" stroke-width="0.5" width="80" x="10" y="10"></rect>
+<circle cx="50" cy="50" r="30" stroke="currentColor" stroke-width="0.5"></circle>
+<line stroke="currentColor" stroke-width="0.5" x1="10" x2="90" y1="10" y2="90"></line>
+<line stroke="currentColor" stroke-width="0.5" x1="90" x2="10" y1="10" y2="90"></line>
+</svg>
+</div>
+</body></html>

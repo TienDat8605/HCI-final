@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Hand Control Zones - Blueprint Rehab</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary": "#00012e",
+                    "surface-container-lowest": "#ffffff",
+                    "on-tertiary-container": "#6e79ff",
+                    "secondary-container": "#a5eff9",
+                    "on-tertiary": "#ffffff",
+                    "primary-container": "#101d42",
+                    "on-secondary-fixed-variant": "#004f56",
+                    "on-primary-container": "#7a85b0",
+                    "primary": "#00051e",
+                    "on-primary": "#ffffff",
+                    "surface-dim": "#d5dbe0",
+                    "error-container": "#ffdad6",
+                    "on-error": "#ffffff",
+                    "on-tertiary-fixed": "#00036b",
+                    "on-secondary-fixed": "#001f23",
+                    "surface-container-highest": "#dde3e9",
+                    "on-primary-fixed-variant": "#39456c",
+                    "secondary-fixed": "#a5eff9",
+                    "outline-variant": "#c6c6cf",
+                    "surface-container-low": "#eff4fa",
+                    "tertiary-container": "#000476",
+                    "secondary-fixed-dim": "#89d2dc",
+                    "surface-container": "#e9eef4",
+                    "surface-tint": "#515d85",
+                    "surface-bright": "#f5faff",
+                    "on-secondary": "#ffffff",
+                    "inverse-on-surface": "#ecf1f7",
+                    "error": "#ba1a1a",
+                    "tertiary-fixed-dim": "#bec2ff",
+                    "tertiary-fixed": "#e0e0ff",
+                    "on-surface-variant": "#45464e",
+                    "on-background": "#161c20",
+                    "outline": "#76767f",
+                    "primary-fixed-dim": "#b9c5f3",
+                    "on-tertiary-fixed-variant": "#1d28ce",
+                    "on-surface": "#161c20",
+                    "surface-variant": "#dde3e9",
+                    "on-secondary-container": "#1c6e77",
+                    "on-error-container": "#93000a",
+                    "surface": "#f5faff",
+                    "on-primary-fixed": "#0c193e",
+                    "surface-container-high": "#e3e9ef",
+                    "primary-fixed": "#dbe1ff",
+                    "background": "#f5faff",
+                    "inverse-surface": "#2b3136",
+                    "secondary": "#116871",
+                    "inverse-primary": "#b9c5f3"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0px",
+                    "lg": "0px",
+                    "xl": "0px",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .blueprint-grid {
+            background-image: radial-gradient(#c6c6cf 0.5px, transparent 0.5px);
+            background-size: 24px 24px;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body selection:bg-secondary-fixed-dim selection:text-primary overflow-hidden">
+<!-- TopAppBar Shell -->
+<header class="bg-[#f5faff] dark:bg-[#0D1317] flex justify-between items-center w-full px-6 h-16 fixed top-0 z-50">
+<div class="flex items-center gap-4">
+<span class="text-xl font-bold tracking-tighter text-[#00051e] dark:text-[#f5faff] uppercase font-headline">Blueprint Rehab</span>
+<div class="h-6 w-[1px] bg-outline-variant/30 ml-2"></div>
+<h1 class="font-headline font-bold tracking-tight text-[#00051e] dark:text-[#f5faff] text-lg ml-2">Hand Control Zones</h1>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden md:flex gap-8">
+<span class="cursor-pointer active:opacity-70 text-[#76767f] dark:text-[#c6c6cf] hover:text-[#116871] transition-colors duration-200 font-headline font-bold text-sm uppercase tracking-wider">Dashboard</span>
+<span class="cursor-pointer active:opacity-70 text-[#00051e] dark:text-[#f5faff] font-bold border-b-2 border-[#116871] font-headline text-sm uppercase tracking-wider">Training</span>
+<span class="cursor-pointer active:opacity-70 text-[#76767f] dark:text-[#c6c6cf] hover:text-[#116871] transition-colors duration-200 font-headline font-bold text-sm uppercase tracking-wider">History</span>
+</div>
+<div class="flex items-center gap-4 ml-4">
+<span class="material-symbols-outlined cursor-pointer text-on-surface-variant hover:text-secondary transition-colors" data-icon="settings">settings</span>
+<span class="material-symbols-outlined cursor-pointer text-on-surface-variant hover:text-secondary transition-colors" data-icon="account_circle">account_circle</span>
+</div>
+</div>
+</header>
+<!-- SideNavBar Shell -->
+<aside class="fixed left-0 top-16 bottom-0 flex flex-col z-40 bg-[#eff4fa] dark:bg-[#0D1317] docked left-0 h-full w-20 md:w-64 border-r-0">
+<div class="p-6 mb-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary-fixed-dim" data-icon="medical_services">medical_services</span>
+</div>
+<div class="hidden md:block">
+<p class="font-headline text-xs font-bold text-primary uppercase tracking-widest leading-none">Rehab Portal</p>
+<p class="text-[10px] text-secondary font-bold uppercase tracking-tighter mt-1">Active Session</p>
+</div>
+</div>
+</div>
+<nav class="flex flex-col flex-1">
+<div class="flex items-center px-6 py-4 cursor-pointer transition-transform duration-150 ease-in-out text-[#76767f] dark:text-[#c6c6cf] hover:bg-[#dde3e9] dark:hover:bg-[#101d42]">
+<span class="material-symbols-outlined" data-icon="info">info</span>
+<span class="ml-4 hidden md:block font-['Inter'] text-sm font-medium uppercase tracking-widest">Instructions</span>
+</div>
+<div class="flex items-center px-6 py-4 cursor-pointer transition-transform duration-150 ease-in-out text-[#76767f] dark:text-[#c6c6cf] hover:bg-[#dde3e9] dark:hover:bg-[#101d42]">
+<span class="material-symbols-outlined" data-icon="fitness_center">fitness_center</span>
+<span class="ml-4 hidden md:block font-['Inter'] text-sm font-medium uppercase tracking-widest">Training</span>
+</div>
+<div class="flex items-center px-6 py-4 cursor-pointer transition-transform duration-150 ease-in-out bg-[#89d2dc]/10 text-[#116871] dark:text-[#89d2dc] border-r-4 border-[#116871]">
+<span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+<span class="ml-4 hidden md:block font-['Inter'] text-sm font-medium uppercase tracking-widest">Zones</span>
+</div>
+<div class="flex items-center px-6 py-4 cursor-pointer transition-transform duration-150 ease-in-out text-[#76767f] dark:text-[#c6c6cf] hover:bg-[#dde3e9] dark:hover:bg-[#101d42]">
+<span class="material-symbols-outlined" data-icon="pause_circle">pause_circle</span>
+<span class="ml-4 hidden md:block font-['Inter'] text-sm font-medium uppercase tracking-widest">Pause</span>
+</div>
+<div class="flex items-center px-6 py-4 cursor-pointer transition-transform duration-150 ease-in-out text-[#76767f] dark:text-[#c6c6cf] hover:bg-[#dde3e9] dark:hover:bg-[#101d42]">
+<span class="material-symbols-outlined" data-icon="assignment">assignment</span>
+<span class="ml-4 hidden md:block font-['Inter'] text-sm font-medium uppercase tracking-widest">Summary</span>
+</div>
+</nav>
+<div class="p-6 mt-auto">
+<div class="bg-surface-container-highest p-4 flex flex-col gap-2">
+<span class="text-[10px] font-bold text-secondary uppercase">Calibration</span>
+<div class="w-full h-1 bg-outline-variant">
+<div class="w-3/4 h-full bg-secondary"></div>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-20 md:ml-64 mt-16 p-8 min-h-screen blueprint-grid relative">
+<div class="max-w-6xl mx-auto flex flex-col h-[calc(100vh-140px)]">
+<!-- Header Section -->
+<div class="flex justify-between items-end mb-8">
+<div class="space-y-2">
+<span class="inline-block px-2 py-1 bg-secondary text-on-secondary text-[10px] font-bold tracking-widest uppercase">Tutorial Stage 02</span>
+<h2 class="text-4xl md:text-5xl font-headline font-bold text-primary tracking-tighter uppercase leading-none">Interface Navigation</h2>
+<p class="text-secondary font-medium tracking-normal max-w-lg">Move hand to zone and hold briefly to select</p>
+</div>
+<div class="hidden lg:block text-right">
+<p class="text-[10px] font-bold text-outline uppercase tracking-widest">System Status</p>
+<p class="text-sm font-headline font-bold text-primary">OPTICAL SENSORS ACTIVE</p>
+</div>
+</div>
+<!-- Central Workspace: Camera View with Zone Overlays -->
+<div class="flex-1 relative bg-primary-container group overflow-hidden border border-outline-variant/10">
+<!-- Camera Feed Simulation -->
+<div class="absolute inset-0 z-0">
+<img alt="Camera view of a patient's hand" class="w-full h-full object-cover opacity-60 grayscale brightness-75" data-alt="Close-up POV of a human hand held up against a neutral background, viewed through a professional medical camera with high contrast and slight blue tint" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-ypOkuIPYMVbfpKtx2v3HkBrtyk7Hj1__WDgJDG0AX9LEn2LMF9vZ7www24Frnb5QXCA7-ipVWlZlJ0rLGFmMrWA1ygiMartSHaZBhP7OrzXrCYUsXF-9vjDd4hgELSzdj8IRRP2h7UkC8G7NfBG9YkqdJs4zcSCDutv_5avM22m3RRZpnmnHCeii6SxOUnuQ87e7iWE78OjVPgRCrMLFNP3aOeu0HxNKudA2KDJWNvh04TevnXwT31mn5ZENClj_36gX2IB_ITqt"/>
+</div>
+<!-- Hand Tracking HUD Overlay -->
+<div class="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+<!-- Scanning Lines -->
+<div class="absolute inset-0 bg-gradient-to-b from-transparent via-secondary-fixed-dim/5 to-transparent h-24 w-full top-1/4 animate-pulse"></div>
+<!-- Interface Zones (The Grid) -->
+<div class="grid grid-cols-3 grid-rows-3 w-full h-full p-4 gap-4">
+<!-- Top Zone: View Summary -->
+<div class="col-start-2 row-start-1 bg-surface-container-lowest/10 backdrop-blur-md border border-secondary-fixed-dim/30 flex flex-col items-center justify-center p-4 transition-all duration-300">
+<span class="material-symbols-outlined text-secondary-fixed-dim text-4xl mb-2" data-icon="assignment">assignment</span>
+<span class="text-[10px] font-headline font-bold text-secondary-fixed-dim uppercase tracking-widest">View Summary</span>
+<!-- Progress Ring (Simulated) -->
+<div class="mt-2 w-12 h-1 bg-primary-container/40 relative">
+<div class="absolute inset-0 bg-secondary-fixed-dim w-0"></div>
+</div>
+</div>
+<!-- Left Zone: Back/Previous -->
+<div class="col-start-1 row-start-2 bg-surface-container-lowest/10 backdrop-blur-md border border-secondary-fixed-dim/30 flex flex-col items-center justify-center p-4 transition-all duration-300">
+<span class="material-symbols-outlined text-secondary-fixed-dim text-4xl mb-2" data-icon="chevron_left">chevron_left</span>
+<span class="text-[10px] font-headline font-bold text-secondary-fixed-dim uppercase tracking-widest">Back / Previous</span>
+</div>
+<!-- Center Zone: Start/Continue (The Focus Zone) -->
+<div class="col-start-2 row-start-2 bg-secondary/20 backdrop-blur-lg border-2 border-secondary flex flex-col items-center justify-center p-4 shadow-2xl relative overflow-hidden group-hover:scale-105 transition-all">
+<div class="absolute -top-4 -right-4 w-12 h-12 border-t-2 border-r-2 border-secondary"></div>
+<div class="absolute -bottom-4 -left-4 w-12 h-12 border-b-2 border-l-2 border-secondary"></div>
+<span class="material-symbols-outlined text-secondary-fixed-dim text-6xl mb-2" data-icon="play_circle" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+<span class="text-xs font-headline font-bold text-on-primary uppercase tracking-[0.2em]">Start / Continue</span>
+<!-- Tracking Indicator -->
+<div class="mt-4 flex gap-1">
+<div class="w-1.5 h-1.5 rounded-full bg-secondary"></div>
+<div class="w-1.5 h-1.5 rounded-full bg-secondary"></div>
+<div class="w-1.5 h-1.5 rounded-full bg-outline-variant"></div>
+<div class="w-1.5 h-1.5 rounded-full bg-outline-variant"></div>
+</div>
+</div>
+<!-- Right Zone: Next/Forward -->
+<div class="col-start-3 row-start-2 bg-surface-container-lowest/10 backdrop-blur-md border border-secondary-fixed-dim/30 flex flex-col items-center justify-center p-4 transition-all duration-300">
+<span class="material-symbols-outlined text-secondary-fixed-dim text-4xl mb-2" data-icon="chevron_right">chevron_right</span>
+<span class="text-[10px] font-headline font-bold text-secondary-fixed-dim uppercase tracking-widest">Next / Forward</span>
+</div>
+</div>
+</div>
+<!-- Footer Note inside Workspace -->
+<div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-20">
+<div class="bg-primary px-6 py-2 border-t-2 border-secondary-fixed-dim shadow-xl flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary-fixed-dim text-sm" data-icon="back_hand">back_hand</span>
+<span class="text-[10px] font-headline font-bold text-on-primary uppercase tracking-widest">Withdraw hand from zone to pause session</span>
+</div>
+</div>
+</div>
+<!-- Bottom Data Bar -->
+<div class="mt-8 flex flex-col md:flex-row justify-between items-start md:items-center border-t border-outline-variant/30 pt-6">
+<div class="flex gap-12">
+<div>
+<p class="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">Optical Latency</p>
+<p class="text-xl font-headline font-bold text-primary">12ms</p>
+</div>
+<div>
+<p class="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">Zone Sensitivity</p>
+<p class="text-xl font-headline font-bold text-primary">High (Adaptive)</p>
+</div>
+<div>
+<p class="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">Hand Recognized</p>
+<p class="text-xl font-headline font-bold text-secondary flex items-center gap-2">
+                            YES
+                            <span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+</p>
+</div>
+</div>
+<div class="mt-6 md:mt-0 flex gap-4">
+<button class="bg-primary text-on-primary px-8 py-4 font-headline font-bold uppercase tracking-widest text-xs transition-colors hover:bg-secondary active:opacity-70">
+                        Skip Tutorial
+                    </button>
+<button class="border border-primary text-primary px-8 py-4 font-headline font-bold uppercase tracking-widest text-xs transition-all hover:bg-primary hover:text-on-primary active:opacity-70">
+                        Recalibrate
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<!-- FAB for immediate emergency help/exit (Only on appropriate screens) -->
+<div class="fixed bottom-8 right-8 z-50">
+<button class="w-14 h-14 bg-error flex items-center justify-center text-on-error shadow-2xl active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+</div>
+</body></html>

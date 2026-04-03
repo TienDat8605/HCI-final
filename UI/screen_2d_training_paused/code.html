@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Blueprint Rehab - Session Paused</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary": "#00012e",
+                    "surface-container-lowest": "#ffffff",
+                    "on-tertiary-container": "#6e79ff",
+                    "secondary-container": "#a5eff9",
+                    "on-tertiary": "#ffffff",
+                    "primary-container": "#101d42",
+                    "on-secondary-fixed-variant": "#004f56",
+                    "on-primary-container": "#7a85b0",
+                    "primary": "#00051e",
+                    "on-primary": "#ffffff",
+                    "surface-dim": "#d5dbe0",
+                    "error-container": "#ffdad6",
+                    "on-error": "#ffffff",
+                    "on-tertiary-fixed": "#00036b",
+                    "on-secondary-fixed": "#001f23",
+                    "surface-container-highest": "#dde3e9",
+                    "on-primary-fixed-variant": "#39456c",
+                    "secondary-fixed": "#a5eff9",
+                    "outline-variant": "#c6c6cf",
+                    "surface-container-low": "#eff4fa",
+                    "tertiary-container": "#000476",
+                    "secondary-fixed-dim": "#89d2dc",
+                    "surface-container": "#e9eef4",
+                    "surface-tint": "#515d85",
+                    "surface-bright": "#f5faff",
+                    "on-secondary": "#ffffff",
+                    "inverse-on-surface": "#ecf1f7",
+                    "error": "#ba1a1a",
+                    "tertiary-fixed-dim": "#bec2ff",
+                    "tertiary-fixed": "#e0e0ff",
+                    "on-surface-variant": "#45464e",
+                    "on-background": "#161c20",
+                    "outline": "#76767f",
+                    "primary-fixed-dim": "#b9c5f3",
+                    "on-tertiary-fixed-variant": "#1d28ce",
+                    "on-surface": "#161c20",
+                    "surface-variant": "#dde3e9",
+                    "on-secondary-container": "#1c6e77",
+                    "on-error-container": "#93000a",
+                    "surface": "#f5faff",
+                    "on-primary-fixed": "#0c193e",
+                    "surface-container-high": "#e3e9ef",
+                    "primary-fixed": "#dbe1ff",
+                    "background": "#f5faff",
+                    "inverse-surface": "#2b3136",
+                    "secondary": "#116871",
+                    "inverse-primary": "#b9c5f3"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0px",
+                    "lg": "0px",
+                    "xl": "0px",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, .font-headline { font-family: 'Space Grotesk', sans-serif; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface selection:bg-secondary-fixed-dim selection:text-on-secondary-fixed">
+<!-- TopAppBar -->
+<header class="bg-[#f5faff] dark:bg-[#0D1317] flex justify-between items-center w-full px-6 h-16 fixed top-0 z-50">
+<div class="flex items-center gap-4">
+<span class="text-xl font-bold tracking-tighter text-[#00051e] dark:text-[#f5faff] uppercase font-['Space_Grotesk']">Blueprint Rehab</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden md:flex gap-8 items-center">
+<span class="text-[#76767f] dark:text-[#c6c6cf] hover:text-[#116871] transition-colors duration-200 cursor-pointer active:opacity-70 font-['Space_Grotesk'] font-bold tracking-tight">Active Session</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#00051e] dark:text-[#f5faff] cursor-pointer" data-icon="settings">settings</span>
+<span class="material-symbols-outlined text-[#00051e] dark:text-[#f5faff] cursor-pointer" data-icon="account_circle">account_circle</span>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-16 bottom-0 flex flex-col z-40 bg-[#eff4fa] dark:bg-[#0D1317] h-full w-20 md:w-64 border-r-0 transition-transform duration-150 ease-in-out">
+<div class="p-6 mb-8 hidden md:block">
+<p class="font-['Inter'] text-sm font-medium uppercase tracking-widest text-[#116871] dark:text-[#89d2dc]">Rehab Portal</p>
+<p class="text-[10px] text-[#76767f] dark:text-[#c6c6cf] uppercase tracking-[0.2em] mt-1">Active Session</p>
+</div>
+<div class="flex flex-col flex-1">
+<a class="flex items-center px-6 py-4 text-[#76767f] dark:text-[#c6c6cf] hover:bg-[#dde3e9] dark:hover:bg-[#101d42] transition-all group" href="#">
+<span class="material-symbols-outlined mr-4" data-icon="info">info</span>
+<span class="font-['Inter'] text-sm font-medium uppercase tracking-widest hidden md:inline">Instructions</span>
+</a>
+<a class="flex items-center px-6 py-4 text-[#76767f] dark:text-[#c6c6cf] hover:bg-[#dde3e9] dark:hover:bg-[#101d42] transition-all group" href="#">
+<span class="material-symbols-outlined mr-4" data-icon="fitness_center">fitness_center</span>
+<span class="font-['Inter'] text-sm font-medium uppercase tracking-widest hidden md:inline">Training</span>
+</a>
+<a class="flex items-center px-6 py-4 text-[#76767f] dark:text-[#c6c6cf] hover:bg-[#dde3e9] dark:hover:bg-[#101d42] transition-all group" href="#">
+<span class="material-symbols-outlined mr-4" data-icon="grid_view">grid_view</span>
+<span class="font-['Inter'] text-sm font-medium uppercase tracking-widest hidden md:inline">Zones</span>
+</a>
+<!-- Active State: Pause (Current Page) -->
+<a class="flex items-center px-6 py-4 bg-[#89d2dc]/10 text-[#116871] dark:text-[#89d2dc] border-r-4 border-[#116871] transition-all group" href="#">
+<span class="material-symbols-outlined mr-4" data-icon="pause_circle" style="font-variation-settings: 'FILL' 1;">pause_circle</span>
+<span class="font-['Inter'] text-sm font-medium uppercase tracking-widest hidden md:inline">Pause</span>
+</a>
+<a class="flex items-center px-6 py-4 text-[#76767f] dark:text-[#c6c6cf] hover:bg-[#dde3e9] dark:hover:bg-[#101d42] transition-all group" href="#">
+<span class="material-symbols-outlined mr-4" data-icon="assignment">assignment</span>
+<span class="font-['Inter'] text-sm font-medium uppercase tracking-widest hidden md:inline">Summary</span>
+</a>
+</div>
+<div class="p-4 md:p-6 mt-auto">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary-fixed-dim" data-icon="person">person</span>
+</div>
+<div class="hidden md:block">
+<p class="text-xs font-bold text-on-surface uppercase tracking-tighter">Alex Chen</p>
+<p class="text-[10px] text-outline uppercase">ID: BR-9921</p>
+</div>
+</div>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="ml-20 md:ml-64 pt-16 h-screen flex flex-col overflow-hidden bg-surface-container-low">
+<!-- Header Section -->
+<div class="px-8 pt-10 pb-6 flex justify-between items-end">
+<div class="max-w-xl">
+<div class="flex items-center gap-3 mb-2">
+<span class="w-2 h-2 bg-error"></span>
+<span class="text-xs font-bold uppercase tracking-[0.3em] text-error">Hand Withdrawn</span>
+</div>
+<h1 class="text-6xl font-bold font-headline tracking-tighter uppercase leading-none">Session Paused</h1>
+</div>
+<div class="text-right hidden lg:block">
+<p class="text-[10px] text-outline uppercase tracking-widest mb-1">Elapsed Time</p>
+<p class="text-3xl font-headline font-bold text-primary">12:44</p>
+</div>
+</div>
+<!-- The Main Focused Area (Blueprint Overlay) -->
+<div class="flex-1 px-8 pb-8 flex items-center justify-center relative group">
+<!-- Background "Last Captured Pose" Image -->
+<div class="w-full h-full relative overflow-hidden bg-primary-container">
+<img alt="Physiotherapy session" class="w-full h-full object-cover opacity-30 grayscale" data-alt="Monochrome overhead view of a patient performing a shoulder rehabilitation exercise with technical skeletal tracking lines overlaid in cyan" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAnvG8A2j9L6pp0x9n5W5cgSSdsSUWSyGij9UN8WXriObmKzr3n1_HD6DjBHu7fN2YU3joFyHuNBQq_1_jpP8b9NsHQTbBBKU5Ri_BM23gt7IAU8Nzse7aIPVX8IIiNxHmxaKfKbAs1HkYdTs63DxCqAYEYXq0GNnSvN_SbYBn_kl0hU_dC8-1sByqU-UGqfPCL0ULku_dypmaK7gKkr5JwrNXQEGvNpYguuUpQZqmpaGHV3_Ot_cBSL80jHgd3yBwncnTytFitD4bu"/>
+<!-- PAUSE OVERLAY (Glassmorphism + Technical Lines) -->
+<div class="absolute inset-0 flex flex-col items-center justify-center backdrop-blur-md bg-primary-container/40">
+<!-- Center Navigation Prompt -->
+<div class="relative flex flex-col items-center gap-6 p-12 border-2 border-secondary-fixed-dim/30">
+<!-- Top Hint -->
+<div class="absolute -top-4 left-1/2 -translate-x-1/2 bg-secondary-fixed text-on-secondary-fixed px-3 py-1 text-[10px] font-bold uppercase tracking-widest">
+                            Navigation Active
+                        </div>
+<div class="w-32 h-32 rounded-full border-4 border-dashed border-secondary-fixed-dim flex items-center justify-center">
+<span class="material-symbols-outlined text-6xl text-surface-bright" data-icon="front_hand">front_hand</span>
+</div>
+<div class="text-center">
+<h2 class="text-3xl font-headline font-bold text-surface-bright uppercase tracking-tight mb-2">Hold Center to Resume</h2>
+<div class="h-1 w-full bg-surface-variant/20 overflow-hidden">
+<div class="h-full bg-secondary-fixed-dim w-1/3"></div>
+</div>
+</div>
+</div>
+<!-- Left/Right Switch Context -->
+<div class="absolute left-8 top-1/2 -translate-y-1/2 flex flex-col items-center gap-2">
+<span class="material-symbols-outlined text-4xl text-outline-variant" data-icon="chevron_left">chevron_left</span>
+<p class="vertical-text [writing-mode:vertical-rl] text-[10px] font-bold uppercase tracking-widest text-outline-variant">Previous Exercise</p>
+</div>
+<div class="absolute right-8 top-1/2 -translate-y-1/2 flex flex-col items-center gap-2">
+<span class="material-symbols-outlined text-4xl text-outline-variant" data-icon="chevron_right">chevron_right</span>
+<p class="vertical-text [writing-mode:vertical-rl] text-[10px] font-bold uppercase tracking-widest text-outline-variant rotate-180">Next Exercise</p>
+</div>
+<!-- Up for Summary -->
+<div class="absolute top-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
+<p class="text-[10px] font-bold uppercase tracking-widest text-outline-variant">Move Up for Summary</p>
+<span class="material-symbols-outlined text-4xl text-outline-variant" data-icon="keyboard_double_arrow_up">keyboard_double_arrow_up</span>
+</div>
+<!-- Lateral Instructions Banner -->
+<div class="absolute bottom-12 w-full flex justify-center px-12">
+<div class="max-w-3xl w-full flex justify-between items-center text-surface-bright/70 border-t border-surface-variant/20 pt-6">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined" data-icon="swap_horiz">swap_horiz</span>
+<span class="text-xs uppercase tracking-widest font-bold">Move Left/Right to Switch Exercise</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined" data-icon="timer">timer</span>
+<span class="text-xs uppercase tracking-widest font-bold">Automatic Resume in 02:00</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Asymmetric Floating Info Card -->
+<div class="absolute right-0 bottom-16 bg-surface-bright p-8 w-80 shadow-2xl z-20">
+<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-secondary mb-4">Current Progress</p>
+<div class="space-y-6">
+<div>
+<div class="flex justify-between items-center mb-1">
+<span class="text-xs font-medium text-outline uppercase tracking-tight">Reps Completed</span>
+<span class="text-xl font-headline font-bold">08/12</span>
+</div>
+<div class="h-[2px] bg-surface-container-highest w-full">
+<div class="h-full bg-secondary-fixed-dim w-2/3"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between items-center mb-1">
+<span class="text-xs font-medium text-outline uppercase tracking-tight">Form Accuracy</span>
+<span class="text-xl font-headline font-bold">92%</span>
+</div>
+<div class="h-[2px] bg-surface-container-highest w-full">
+<div class="h-full bg-secondary-fixed-dim w-[92%]"></div>
+</div>
+</div>
+</div>
+<button class="mt-8 w-full bg-primary text-on-primary py-4 text-xs font-bold uppercase tracking-widest hover:bg-secondary transition-colors duration-200">
+                    Force End Session
+                </button>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation (Mobile Only) -->
+<div class="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface flex justify-around items-center border-t border-surface-container shadow-lg z-50">
+<span class="material-symbols-outlined text-outline" data-icon="info">info</span>
+<span class="material-symbols-outlined text-outline" data-icon="fitness_center">fitness_center</span>
+<span class="material-symbols-outlined text-secondary" data-icon="pause_circle" style="font-variation-settings: 'FILL' 1;">pause_circle</span>
+<span class="material-symbols-outlined text-outline" data-icon="grid_view">grid_view</span>
+<span class="material-symbols-outlined text-outline" data-icon="assignment">assignment</span>
+</div>
+</body></html>

@@ -29,6 +29,7 @@ CLIPS_DIR     = os.path.join(DATA_DIR, "clips")
 LANDMARKS_DIR = os.path.join(DATA_DIR, "landmarks")
 KEYFRAMES_DIR = os.path.join(DATA_DIR, "keyframes")
 MODEL_PATH    = os.path.join(DATA_DIR, "hand_landmarker.task")
+LANDMARK_SAMPLE_STRIDE = 6
 
 
 def ensure_dirs():
@@ -108,8 +109,8 @@ def extract_landmarks():
                 if not ret:
                     break
 
-                # Process every 3rd frame to reduce data size
-                if frame_idx % 3 == 0:
+                # Process every nth frame to keep the guided sequence lightweight.
+                if frame_idx % LANDMARK_SAMPLE_STRIDE == 0:
                     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
                     timestamp_ms = int(frame_idx * 1000 / fps)
@@ -151,8 +152,8 @@ def extract_landmarks():
             "exercise_id": ex["id"],
             "exercise_name": ex["name"],
             "fps": fps,
-            "sample_rate": 3,
-            "effective_fps": round(fps / 3, 2),
+            "sample_rate": LANDMARK_SAMPLE_STRIDE,
+            "effective_fps": round(fps / LANDMARK_SAMPLE_STRIDE, 2),
             "total_frames": total_frames,
             "sampled_frames": len(landmark_sequence),
             "frames": landmark_sequence,
