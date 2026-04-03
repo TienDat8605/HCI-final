@@ -25,7 +25,11 @@ Python packages:
 
 ## Run from scratch
 
-If you are starting from a clean checkout, the easiest path is to use the data already included in `data/` and run the server.
+If you are starting from a clean checkout, the setup flow is:
+
+1. Install the Python dependencies.
+2. Run `process_video.py` to generate the exercise assets.
+3. Start the Flask server.
 
 1. Create and activate a virtual environment.
 
@@ -40,32 +44,19 @@ If you are starting from a clean checkout, the easiest path is to use the data a
    pip install flask opencv-python mediapipe numpy
    ```
 
-3. Start the app.
-
-   ```bash
-   python app.py
-   ```
-
-4. Open `http://localhost:5000` in your browser.
-
-## Regenerate the exercise data
-
-Use this only if you have the source video file that the generator expects.
-
-1. Put the reference video next to `process_video.py` as `hand-exercise.mp4`.
-2. Keep `data/hand_landmarker.task` in place. It is not created by this repository; it is the prebuilt MediaPipe Hand Landmarker task model that the generator loads.
-3. Run the preprocessing script.
+3. Run the preprocessing script first.
 
    ```bash
    python process_video.py
    ```
 
-That script will:
+4. Start the app.
 
-- split the source video into exercise clips under `data/clips/`
-- extract landmark sequences into `data/landmarks/`
-- extract keyframes into `data/keyframes/`
-- regenerate `data/exercises.json`
+   ```bash
+   python app.py
+   ```
+
+5. Open `http://localhost:5000` in your browser.
 
 ## Notes
 
