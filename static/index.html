@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Hand Exercise Recovery Assistant — Real-time hand gesture tracking and comparison for rehabilitation exercises">
+    <title>Hand Exercise Recovery Assistant</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- SVG Gradients -->
+<svg width="0" height="0" style="position:absolute">
+    <defs>
+        <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#10b981"/>
+            <stop offset="100%" style="stop-color:#34d399"/>
+        </linearGradient>
+    </defs>
+</svg>
+
+<!-- Header -->
+<header class="header">
+    <div class="header-logo">
+        <div class="icon">🤚</div>
+        <h1>Hand Exercise Recovery</h1>
+    </div>
+    <div class="header-status">
+        <div class="status-dot" id="cameraStatus"></div>
+        <span id="cameraStatusText">Camera off</span>
+    </div>
+</header>
+
+<!-- Main Layout -->
+<div class="app-container">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-title">Exercises</div>
+        <div class="exercise-list" id="exerciseList">
+            <!-- Populated by JS -->
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+        <!-- Welcome Screen -->
+        <div class="welcome-screen" id="welcomeScreen">
+            <div class="welcome-inner">
+                <div class="welcome-icon">🖐️</div>
+                <h2>Welcome to Hand Recovery</h2>
+                <p>Select an exercise from the left panel to begin. The app will compare your hand gestures in real-time with the reference exercise and provide feedback to help you recover.</p>
+            </div>
+        </div>
+
+        <!-- Exercise View -->
+        <div class="exercise-view" id="exerciseView">
+
+            <!-- Exercise Header -->
+            <div class="exercise-header">
+                <h2 id="exerciseTitle"></h2>
+                <div style="display:flex;gap:10px">
+                    <button class="btn btn-outline" id="btnToggleCamera" onclick="toggleCamera()">
+                        📷 Start Camera
+                    </button>
+                    <button class="btn btn-primary" id="btnStartExercise" onclick="startExercise()" disabled>
+                        ▶ Start Exercise
+                    </button>
+                </div>
+            </div>
+
+            <!-- Video Grid -->
+            <div class="video-grid">
+                <!-- Reference Video -->
+                <div class="video-panel">
+                    <div class="video-panel-header">
+                        <h3>📹 Reference <span class="badge badge-ref">GUIDE</span></h3>
+                    </div>
+                    <div class="video-wrapper">
+                        <video id="refVideo" loop muted playsinline></video>
+                    </div>
+                    <div style="padding:12px 18px;">
+                        <div class="keyframes-strip" id="keyframesStrip"></div>
+                    </div>
+                </div>
+
+                <!-- Live Webcam -->
+                <div class="video-panel">
+                    <div class="video-panel-header">
+                        <h3>🎥 Your Hand <span class="badge badge-live">LIVE</span></h3>
+                    </div>
+                    <div class="video-wrapper" id="webcamContainer">
+                        <video id="webcamVideo" autoplay playsinline style="display:none;transform:scaleX(-1)"></video>
+                        <canvas id="webcamCanvas" style="transform:scaleX(-1)"></canvas>
+                        <div id="webcam-placeholder">
+                            <div class="icon">📷</div>
+                            <p>Click "Start Camera" to begin</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Score Panel -->
+            <div class="score-panel" id="scorePanel">
+                <div class="score-panel-header">
+                    <h3>📊 Performance</h3>
+                </div>
+
+                <div id="scoreContent">
+                    <div class="no-data">
+                        <div class="icon">📏</div>
+                        <p>Start the exercise and show your hand to see real-time scoring</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</div>
+
+<!-- MediaPipe Hands JS -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1675466124/drawing_utils.min.js" crossorigin="anonymous"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
