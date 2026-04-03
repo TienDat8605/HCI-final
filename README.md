@@ -23,13 +23,7 @@ Python packages:
 - `mediapipe`
 - `numpy`
 
-## Run from scratch
-
-If you are starting from a clean checkout, the setup flow is:
-
-1. Install the Python dependencies.
-2. Run `process_video.py` to generate the exercise assets.
-3. Start the Flask server.
+## How to run
 
 1. Create and activate a virtual environment.
 
@@ -38,19 +32,19 @@ If you are starting from a clean checkout, the setup flow is:
    source .venv/bin/activate
    ```
 
-2. Install the Python dependencies.
+2. Install the dependencies.
 
    ```bash
    pip install flask opencv-python mediapipe numpy
    ```
 
-3. Run the preprocessing script first.
+3. Generate the exercise assets.
 
    ```bash
    python process_video.py
    ```
 
-4. Start the app.
+4. Start the server.
 
    ```bash
    python app.py
