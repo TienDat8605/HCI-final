@@ -56,7 +56,7 @@ const EXERCISE_COPY = {
 
 const ZONE_HOLD_MS = 2500;
 const MATCH_HOLD_MS = 450;
-const PAUSE_HAND_LOSS_MS = 900;
+const PAUSE_HAND_LOSS_MS = 2000;
 const SCORE_SAMPLE_MS = 180;
 const PROGRESS_MATCH_THRESHOLD = 40;
 const PROGRESS_SOFT_THRESHOLD = 20;
@@ -83,6 +83,7 @@ const FALLBACK_GAME_HUD = {
     secondaryValue: 'Follow guide checkpoints',
     statusText: 'Gamification scaffold active',
 };
+const DEV_AUTOSTART_GAME_MODE = true;
 
 const appState = {
     exercises: [],
@@ -172,6 +173,7 @@ function syncTrainingGameSnapshot(training) {
     training.gameModeTitle = snapshot.modeTitle || training.gameModeTitle || 'Unknown Mode';
     training.gameHud = { ...FALLBACK_GAME_HUD, ...(snapshot.hud || {}) };
     training.gameSummary = snapshot.summary || null;
+    training.gameData = snapshot.gameData || null;
 }
 
 function clamp(value, min, max) {
@@ -291,6 +293,12 @@ function updateShell() {
 
 function getScreenZoneConfig() {
     const hasAnySummary = Boolean(appState.training || appState.currentSummary || appState.lastSessionSummary);
+    const isLeaderboardPause = Boolean(
+        appState.screen === 'paused'
+        && appState.training
+        && appState.training.pauseReason === 'leaderboard'
+        && appState.training.sessionMode === 'game'
+    );
 
     switch (appState.screen) {
         case 'zones':
@@ -308,6 +316,14 @@ function getScreenZoneConfig() {
                 right: { enabled: appState.exercises.length > 1, label: 'Next', description: 'Hold on your right side to switch to the next exercise.' },
             };
         case 'paused':
+            if (isLeaderboardPause) {
+                return {
+                    top: { enabled: true, label: 'Return', description: 'Exit leaderboard and go back to instructions.' },
+                    left: { enabled: appState.exercises.length > 1, label: 'Prev Mode', description: 'Switch to previous game mode.' },
+                    center: { enabled: true, label: 'Play Again', description: 'Restart this game mode now.' },
+                    right: { enabled: appState.exercises.length > 1, label: 'Next Mode', description: 'Switch to next game mode.' },
+                };
+            }
             return {
                 top: { enabled: hasAnySummary, label: 'Summary', description: 'Review the current session summary.' },
                 left: { enabled: appState.exercises.length > 1, label: 'Previous', description: 'Leave pause and open the previous exercise instructions.' },
@@ -499,6 +515,7 @@ function renderInstructionScreen() {
     const copy = getExerciseCopy(exercise);
     const hasGuidance = Boolean(appState.referenceData && appState.guideFrames.length);
     const hasVideo = Boolean(exercise && exercise.video_ready);
+    const gameModeAvailable = Boolean(exercise && exercise.id === 5 && hasGuidance);
     const showWarning = exercise && (!exercise.landmarks_ready || !exercise.video_ready);
     const zoneConfig = getScreenZoneConfig();
 
@@ -545,7 +562,10 @@ function renderInstructionScreen() {
                             <button class="button button-secondary" type="button" data-action="prev-exercise">Previous</button>
                             <button class="button button-secondary" type="button" data-action="next-exercise">Next</button>
                             <button class="button button-primary" type="button" data-action="start-training" data-zone-card="center" ${hasGuidance ? '' : 'disabled'}>
-                                Hold Center To Start
+                                Start Normal Mode
+                            </button>
+                            <button class="button button-secondary" type="button" data-action="start-game-mode" ${gameModeAvailable ? '' : 'disabled'}>
+                                Start Game Mode
                             </button>
                         </div>
                     </section>
@@ -582,8 +602,9 @@ function renderTrainingScreen() {
     const completed = training ? training.guideIndex : 0;
     const progressPercent = getCompletionPercent(completed);
     const currentCue = training ? training.cueText : 'Match the next pose.';
-    const gameModeTitle = training ? training.gameModeTitle : 'Mode';
-    const gameHud = training ? training.gameHud : FALLBACK_GAME_HUD;
+    const showGameHud = Boolean(training && training.sessionMode === 'game');
+    const gameModeTitle = showGameHud ? training.gameModeTitle : 'Mode';
+    const gameHud = showGameHud ? training.gameHud : FALLBACK_GAME_HUD;
 
     return `
         <section class="screen training-screen">
@@ -622,25 +643,189 @@ function renderTrainingScreen() {
                                 <span id="trainingCueText">Watch the instruction clip first, then use the live cue to refine the weakest finger or wrist position.</span>
                             </div>
 
-                            <div class="training-game-hud">
-                                <strong id="trainingGameModeTitle">${gameModeTitle}</strong>
-                                <div class="training-game-grid">
-                                    <div>
-                                        <span id="trainingGamePrimaryLabel">${gameHud.primaryLabel}</span>
-                                        <b id="trainingGamePrimaryValue">${gameHud.primaryValue}</b>
+                            ${showGameHud ? `
+                                <div class="training-game-hud">
+                                    <strong id="trainingGameModeTitle">${gameModeTitle}</strong>
+                                    <div class="training-game-grid">
+                                        <div>
+                                            <span id="trainingGamePrimaryLabel">${gameHud.primaryLabel}</span>
+                                            <b id="trainingGamePrimaryValue">${gameHud.primaryValue}</b>
+                                        </div>
+                                        <div>
+                                            <span id="trainingGameSecondaryLabel">${gameHud.secondaryLabel}</span>
+                                            <b id="trainingGameSecondaryValue">${gameHud.secondaryValue}</b>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <span id="trainingGameSecondaryLabel">${gameHud.secondaryLabel}</span>
-                                        <b id="trainingGameSecondaryValue">${gameHud.secondaryValue}</b>
-                                    </div>
+                                    <small id="trainingGameStatusText">${gameHud.statusText}</small>
                                 </div>
-                                <small id="trainingGameStatusText">${gameHud.statusText}</small>
-                            </div>
+                            ` : ''}
 
                             <div class="training-edge-note">Withdraw hand to pause session</div>
                         </div>
                     </div>
                 </section>
+            </div>
+        </section>
+    `;
+}
+
+function getTimingMarkerPosition(progress, timingWidth = 600, timingHeight = 150) {
+    const clamped = clamp(progress || 0, 0, 1);
+    const startX = timingWidth * 0.11;
+    const endX = timingWidth * 0.89;
+    const y = timingHeight * 0.58;
+    const x = startX + (endX - startX) * clamped;
+    return { x, y };
+}
+
+function renderJuiceOrders(orders, activeOrderIndex) {
+    if (!Array.isArray(orders) || !orders.length) {
+        return `
+            <div class="juice-order-row">
+                <div class="juice-order-icon" aria-hidden="true">🍊</div>
+                <div class="juice-order-info">
+                    <strong>250ml</strong>
+                    <small>0%</small>
+                </div>
+                <span class="juice-zone-badge" data-zone="bad">Wait</span>
+            </div>
+        `;
+    }
+
+    return orders.map((order, index) => {
+        const zoneKey = order.zoneKey || 'bad';
+        const zoneLabel = order.zoneLabel || (index === activeOrderIndex ? 'Active' : 'Wait');
+        const progressPercent = `${Math.round(clamp(order.progress || 0, 0, 1) * 100)}%`;
+        const stateClass = order.status === 'done'
+            ? 'is-done'
+            : (index === activeOrderIndex ? 'is-active' : 'is-muted');
+        return `
+            <div class="juice-order-row ${stateClass}" data-order-index="${index}">
+                <div class="juice-order-icon" aria-hidden="true">${order.icon || '🍊'}</div>
+                <div class="juice-order-info">
+                    <strong>${order.targetMl || 250}ml</strong>
+                    <small data-order-progress>${progressPercent}</small>
+                </div>
+                <span class="juice-zone-badge" data-order-zone data-zone="${zoneKey}">${zoneLabel}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderStrengtheningGameScreen() {
+    const exercise = getCurrentExercise();
+    const training = appState.training;
+    const game = (training && training.gameData) ? training.gameData : {
+        markerProgress: 0,
+        cupMl: 0,
+        targetMl: 150,
+        zoneLabel: 'Bad',
+        zoneKey: 'bad',
+        isSqueezing: false,
+        orderProgress: 0,
+        activeOrderIndex: 0,
+        orders: [
+            { icon: '🍊', targetMl: 250, progress: 0, zoneKey: 'bad', zoneLabel: 'Active', status: 'active' },
+            { icon: '🍋', targetMl: 500, progress: 0, zoneKey: 'bad', zoneLabel: 'Wait', status: 'queue' },
+        ],
+        resultPopup: { visible: false, zoneKey: 'bad', title: '', detail: '' },
+    };
+    const markerPoint = getTimingMarkerPosition(game.markerProgress);
+    const cupPercent = clamp((game.cupMl / Math.max(1, game.targetMl || 150)) * 100, 0, 100);
+    const popup = game.resultPopup || { visible: false, zoneKey: 'bad', title: '', detail: '' };
+
+    return `
+        <section class="screen training-screen strengthening-game-screen">
+            <div class="strengthening-game-layout">
+                <aside class="juice-side-panel juice-side-panel-left">
+                    <div class="juice-card juice-target-cup-card ${game.isSqueezing ? 'is-dripping' : ''}">
+                        <div class="juice-card-kicker">Target</div>
+                        <div class="juice-target-top">
+                            <h3>Orange</h3>
+                            <div class="juice-fruit">🍊</div>
+                        </div>
+                        <div class="juice-drips" aria-hidden="true">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                        <div class="juice-cup">
+                            <div id="juiceCupFill" class="juice-cup-fill" style="height:${cupPercent}%;"></div>
+                            <div class="juice-cup-outline"></div>
+                        </div>
+                        <div id="juiceCupValue" class="juice-cup-value">${Math.round(game.cupMl)} / ${game.targetMl} ml</div>
+                    </div>
+                </aside>
+
+                <section class="strengthening-stage-column">
+                    <div class="training-stage-shell strengthening-stage-shell">
+                        <div id="cameraMount" class="stage-mount"></div>
+                        <div class="training-overlay">
+                            <div class="training-head">
+                                <div>
+                                    <div class="training-subtitle">Squeeze Game</div>
+                                    <h2 class="training-title">${exercise ? exercise.name : 'Strengthening'}</h2>
+                                </div>
+                                <div class="status-box">
+                                    <strong>Status</strong>
+                                    <span id="trainingCalibrationText">Scanning live hand</span>
+                                    <div class="status-caption">Timing bar active</div>
+                                </div>
+                            </div>
+
+                            <div class="training-game-hud">
+                                <strong id="trainingGameModeTitle">${training ? training.gameModeTitle : 'Game Mode'}</strong>
+                                <div class="training-game-grid">
+                                    <div>
+                                        <span id="trainingGamePrimaryLabel">Score</span>
+                                        <b id="trainingGamePrimaryValue">${training ? training.gameHud.primaryValue : FALLBACK_GAME_HUD.primaryValue}</b>
+                                    </div>
+                                    <div>
+                                        <span id="trainingGameSecondaryLabel">Zone</span>
+                                        <b id="trainingGameSecondaryValue">${training ? training.gameHud.secondaryValue : FALLBACK_GAME_HUD.secondaryValue}</b>
+                                    </div>
+                                </div>
+                                <small id="trainingGameStatusText">${training ? training.gameHud.statusText : FALLBACK_GAME_HUD.statusText}</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="juice-timing-shell">
+                        <svg class="juice-timing-arc" viewBox="0 0 600 220" preserveAspectRatio="none" aria-hidden="true">
+                            <path d="M66 128 L534 128" pathLength="100" class="juice-arc-base"></path>
+                            <path d="M66 128 L534 128" pathLength="100" class="juice-arc-good-left"></path>
+                            <path d="M66 128 L534 128" pathLength="100" class="juice-arc-excellent"></path>
+                            <path d="M66 128 L534 128" pathLength="100" class="juice-arc-good-right"></path>
+                        </svg>
+                        <div
+                            id="juiceTimingMarker"
+                            class="juice-timing-marker"
+                            data-zone="${game.zoneKey}"
+                            style="left:${markerPoint.x}px; top:${markerPoint.y}px;"
+                        ></div>
+                        <div
+                            id="juiceResultPopup"
+                            class="juice-result-popup ${popup.visible ? 'is-visible' : ''}"
+                            data-zone="${popup.zoneKey || 'bad'}"
+                        >
+                            <strong id="juiceResultTitle">${popup.title || ''}</strong>
+                            <small id="juiceResultDetail">${popup.detail || ''}</small>
+                        </div>
+                    </div>
+                </section>
+
+                <aside class="juice-side-panel juice-side-panel-right">
+                    <div class="juice-card">
+                        <div class="juice-card-kicker">Orders</div>
+                        ${renderJuiceOrders(game.orders, game.activeOrderIndex || 0)}
+                    </div>
+                    <div class="juice-card">
+                        <div class="juice-card-kicker">Hand</div>
+                        <div id="juiceSqueezeState" class="juice-squeeze-state ${game.isSqueezing ? 'is-active' : ''}">
+                            ${game.isSqueezing ? 'Squeezing' : 'Released'}
+                        </div>
+                    </div>
+                </aside>
             </div>
         </section>
     `;
@@ -654,6 +839,54 @@ function renderPausedScreen() {
         : 0;
     const exercise = getCurrentExercise();
     const hasVideo = Boolean(exercise && exercise.video_ready);
+    const isLeaderboardPause = Boolean(training && training.pauseReason === 'leaderboard' && training.sessionMode === 'game');
+    const gameData = training ? training.gameData : null;
+    const leaderboard = gameData && Array.isArray(gameData.leaderboard) ? gameData.leaderboard : [];
+    const modeScore = training && training.gameHud ? training.gameHud.primaryValue : '0';
+
+    if (isLeaderboardPause) {
+        return `
+            <section class="screen paused-shell">
+                <div class="paused-header">
+                    <div>
+                        <div class="screen-kicker" style="color: var(--secondary);">Orders Completed</div>
+                        <h2 class="paused-title">Leaderboard</h2>
+                    </div>
+                    <div class="screen-meta">Total Score ${modeScore}</div>
+                </div>
+
+                <div class="paused-content">
+                    <div class="paused-stage-shell">
+                        <div id="cameraMount" class="stage-mount"></div>
+                        <div class="paused-overlay">
+                            ${zoneMarkup(getScreenZoneConfig(), 'paused-center-card')}
+                        </div>
+
+                        <div class="paused-float-card paused-leaderboard-card">
+                            <strong>Session Result</strong>
+                            <div class="paused-metric">
+                                <span>Total Point</span>
+                                <b>${modeScore}</b>
+                            </div>
+                            <div class="leaderboard-list">
+                                ${leaderboard.map((entry) => `
+                                    <div class="leaderboard-row ${entry.isPlayer ? 'is-player' : ''}">
+                                        <span>#${entry.rank}</span>
+                                        <span>${entry.name}</span>
+                                        <b>${entry.score}</b>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <div class="button-row" style="margin-top: 12px;">
+                                <button class="button button-primary" type="button" data-action="play-game-again">Play Again</button>
+                                <button class="button button-secondary" type="button" data-action="return-menu">Return</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        `;
+    }
 
     return `
         <section class="screen paused-shell">
@@ -843,7 +1076,12 @@ function render() {
             html = renderInstructionScreen();
             break;
         case 'training':
-            html = renderTrainingScreen();
+            html = appState.training
+                && appState.training.sessionMode === 'game'
+                && getCurrentExercise()
+                && getCurrentExercise().id === 5
+                ? renderStrengtheningGameScreen()
+                : renderTrainingScreen();
             break;
         case 'paused':
             html = renderPausedScreen();
@@ -889,7 +1127,10 @@ async function handleAction(action) {
             setScreen('instructions');
             break;
         case 'start-training':
-            startTrainingSession();
+            startTrainingSession('normal');
+            break;
+        case 'start-game-mode':
+            startTrainingSession('game');
             break;
         case 'prev-exercise':
             await shiftExercise(-1, true);
@@ -900,11 +1141,15 @@ async function handleAction(action) {
         case 'resume-training':
             resumeTraining();
             break;
+        case 'play-game-again':
+            startTrainingSession('game');
+            break;
         case 'open-summary':
             openSummary(true);
             break;
         case 'return-menu':
             appState.currentSummary = null;
+            appState.training = null;
             setScreen('instructions');
             break;
         default:
@@ -1043,17 +1288,19 @@ function buildGuideFrames(referenceData) {
     }));
 }
 
-function startTrainingSession() {
+function startTrainingSession(sessionMode = 'normal') {
     if (!appState.referenceData || !appState.guideFrames.length) {
         showToast('Training needs reference landmarks. Generate data/landmarks first.');
         return;
     }
 
     const exercise = getCurrentExercise();
-    const gameRuntime = createGameRuntime(exercise);
+    const useGameMode = sessionMode === 'game' && exercise && exercise.id === 5;
+    const gameRuntime = useGameMode ? createGameRuntime(exercise) : null;
     const sessionStartedAt = performance.now();
     appState.training = {
         exerciseId: exercise.id,
+        sessionMode: useGameMode ? 'game' : 'normal',
         activeStartedAt: sessionStartedAt,
         activeElapsedMs: 0,
         pauseCount: 0,
@@ -1075,21 +1322,25 @@ function startTrainingSession() {
         cueDetail: 'Once the live score is high enough, hold briefly to confirm the checkpoint.',
         calibrationText: 'Scanning live hand',
         handLossStartedAt: 0,
+        pauseReason: null,
         fingerTotals: { Thumb: 0, Index: 0, Middle: 0, Ring: 0, Pinky: 0 },
         fingerSamples: 0,
         gameRuntime,
-        gameModeId: gameRuntime.modeId,
-        gameModeTitle: gameRuntime.modeTitle,
+        gameModeId: gameRuntime ? gameRuntime.modeId : null,
+        gameModeTitle: gameRuntime ? gameRuntime.modeTitle : null,
         gameHud: { ...FALLBACK_GAME_HUD },
         gameSummary: null,
+        gameData: null,
         lastFrameAt: sessionStartedAt,
     };
-    appState.training.gameRuntime.notifySessionStart({
-        exerciseId: exercise.id,
-        exerciseName: exercise.name,
-        guideCount: getGuideCount(),
-    });
-    syncTrainingGameSnapshot(appState.training);
+    if (appState.training.gameRuntime) {
+        appState.training.gameRuntime.notifySessionStart({
+            exerciseId: exercise.id,
+            exerciseName: exercise.name,
+            guideCount: getGuideCount(),
+        });
+        syncTrainingGameSnapshot(appState.training);
+    }
 
     setScreen('training');
 }
@@ -1102,6 +1353,7 @@ function resumeTraining() {
 
     appState.training.activeStartedAt = performance.now();
     appState.training.handLossStartedAt = 0;
+    appState.training.pauseReason = null;
     appState.training.lastFrameAt = performance.now();
     if (appState.training.gameRuntime && typeof appState.training.gameRuntime.notifyResume === 'function') {
         appState.training.gameRuntime.notifyResume({
@@ -1124,10 +1376,13 @@ function stopTrainingTimer() {
     appState.training.activeElapsedMs += performance.now() - appState.training.activeStartedAt;
 }
 
-function pauseTraining() {
+function pauseTraining(reason = 'hand_lost') {
     if (!appState.training || appState.screen !== 'training') return;
     stopTrainingTimer();
-    appState.training.pauseCount += 1;
+    if (reason !== 'leaderboard') {
+        appState.training.pauseCount += 1;
+    }
+    appState.training.pauseReason = reason;
     appState.training.matchStartedAt = 0;
     appState.training.matchGuideIndex = null;
     appState.training.softMatchStartedAt = 0;
@@ -1282,7 +1537,11 @@ function mountPersistentMedia() {
     if (cameraMount && appState.cameraRunning) {
         cameraMount.appendChild(dom.cameraStage);
         dom.cameraStage.classList.remove('is-hidden');
-        dom.cameraStage.dataset.mode = appState.screen === 'paused' ? 'paused' : appState.screen;
+        dom.cameraStage.dataset.mode = appState.screen === 'paused'
+            ? 'paused'
+            : (appState.screen === 'training' && appState.training && appState.training.sessionMode === 'game'
+                ? 'game'
+                : appState.screen);
         refreshCameraStage();
     }
 
@@ -1485,6 +1744,16 @@ function updateZoneDetection(now) {
     }
 }
 
+function navigateGameMode(direction) {
+    shiftExercise(direction, true).then(() => {
+        if (appState.referenceData && appState.guideFrames.length) {
+            startTrainingSession('game');
+        } else {
+            showToast('Selected mode is not ready. Missing guide data.');
+        }
+    });
+}
+
 function handleZoneAction(zoneName) {
     switch (appState.screen) {
         case 'zones':
@@ -1503,13 +1772,28 @@ function handleZoneAction(zoneName) {
             } else if (zoneName === 'right') {
                 shiftExercise(1, true);
             } else if (zoneName === 'center') {
-                startTrainingSession();
+                startTrainingSession('normal');
             } else if (zoneName === 'top' && appState.lastSessionSummary) {
                 appState.currentSummary = appState.lastSessionSummary;
                 setScreen('summary');
             }
             break;
         case 'paused':
+            if (appState.training && appState.training.pauseReason === 'leaderboard' && appState.training.sessionMode === 'game') {
+                if (zoneName === 'left') {
+                    navigateGameMode(-1);
+                } else if (zoneName === 'right') {
+                    navigateGameMode(1);
+                } else if (zoneName === 'center') {
+                    startTrainingSession('game');
+                } else if (zoneName === 'top') {
+                    appState.training = null;
+                    appState.currentSummary = null;
+                    setScreen('instructions');
+                }
+                break;
+            }
+
             if (zoneName === 'left') {
                 shiftExercise(-1, true);
             } else if (zoneName === 'right') {
@@ -1816,16 +2100,47 @@ function isHandWithdrawn(bounds) {
 function updateTraining(now) {
     const training = appState.training;
     if (!training) return;
+    const isGameMode = training.sessionMode === 'game';
     const deltaSeconds = Math.max(0, (now - (training.lastFrameAt || now)) / 1000);
     training.lastFrameAt = now;
 
     if (!appState.latestLandmarks || isHandWithdrawn(appState.latestBounds)) {
+        const gameData = training.gameData || null;
+        const shouldKeepGameTimersRunning = Boolean(
+            isGameMode
+            && training.gameRuntime
+            && gameData
+            && (gameData.resultPopup && gameData.resultPopup.visible || gameData.orderResolved || gameData.sessionComplete)
+        );
+
+        if (shouldKeepGameTimersRunning) {
+            training.gameRuntime.notifyFrame({
+                now,
+                deltaSeconds,
+                guideIndex: training.guideIndex,
+                completionPercent: getCompletionPercent(training.guideIndex),
+                holdProgress: training.holdProgress,
+                matchScore: 0,
+                result: training.lastResult || null,
+                liveLandmarks: null,
+            });
+            syncTrainingGameSnapshot(training);
+
+            if (training.gameData && training.gameData.sessionComplete) {
+                pauseTraining('leaderboard');
+                return;
+            }
+
+            updateTrainingUI();
+            return;
+        }
+
         if (!training.handLossStartedAt) {
             training.handLossStartedAt = now;
         }
 
         if (now - training.handLossStartedAt >= PAUSE_HAND_LOSS_MS) {
-            pauseTraining();
+            pauseTraining('hand_lost');
         }
 
         updateTrainingUI();
@@ -1834,9 +2149,15 @@ function updateTraining(now) {
 
     training.handLossStartedAt = 0;
 
+    if (isGameMode && training.guideIndex >= appState.guideFrames.length) {
+        training.guideIndex = 0;
+    }
+
     const guide = appState.guideFrames[Math.min(training.guideIndex, appState.guideFrames.length - 1)];
     if (!guide) {
-        finishTraining(true);
+        if (!isGameMode) {
+            finishTraining(true);
+        }
         return;
     }
 
@@ -1898,8 +2219,12 @@ function updateTraining(now) {
                 matchScore: match.score,
                 result,
             })) {
-                finishTraining(true);
-                return;
+                if (isGameMode) {
+                    training.guideIndex = 0;
+                } else {
+                    finishTraining(true);
+                    return;
+                }
             }
         }
     } else if (softMatch) {
@@ -1917,8 +2242,12 @@ function updateTraining(now) {
                 matchScore: match.score,
                 result,
             })) {
-                finishTraining(true);
-                return;
+                if (isGameMode) {
+                    training.guideIndex = 0;
+                } else {
+                    finishTraining(true);
+                    return;
+                }
             }
         }
     } else {
@@ -1933,8 +2262,12 @@ function updateTraining(now) {
                 matchScore: match.score,
                 result,
             })) {
-                finishTraining(true);
-                return;
+                if (isGameMode) {
+                    training.guideIndex = 0;
+                } else {
+                    finishTraining(true);
+                    return;
+                }
             }
         }
     }
@@ -1948,8 +2281,14 @@ function updateTraining(now) {
             holdProgress: training.holdProgress,
             matchScore: match.score,
             result,
+            liveLandmarks: appState.latestLandmarks,
         });
         syncTrainingGameSnapshot(training);
+    }
+
+    if (isGameMode && training.gameData && training.gameData.sessionComplete) {
+        pauseTraining('leaderboard');
+        return;
     }
 
     updateTrainingUI();
@@ -1978,7 +2317,17 @@ function updateTrainingUI() {
     const gameSecondaryLabel = dom.screenRoot.querySelector('#trainingGameSecondaryLabel');
     const gameSecondaryValue = dom.screenRoot.querySelector('#trainingGameSecondaryValue');
     const gameStatusText = dom.screenRoot.querySelector('#trainingGameStatusText');
+    const juiceMarker = dom.screenRoot.querySelector('#juiceTimingMarker');
+    const juiceCupFill = dom.screenRoot.querySelector('#juiceCupFill');
+    const juiceCupValue = dom.screenRoot.querySelector('#juiceCupValue');
+    const juiceSqueezeState = dom.screenRoot.querySelector('#juiceSqueezeState');
+    const juiceTargetCard = dom.screenRoot.querySelector('.juice-target-cup-card');
+    const juiceOrderRows = Array.from(dom.screenRoot.querySelectorAll('[data-order-index]'));
+    const juiceResultPopup = dom.screenRoot.querySelector('#juiceResultPopup');
+    const juiceResultTitle = dom.screenRoot.querySelector('#juiceResultTitle');
+    const juiceResultDetail = dom.screenRoot.querySelector('#juiceResultDetail');
     const gameHud = training.gameHud || FALLBACK_GAME_HUD;
+    const gameData = training.gameData || null;
 
     if (progressFill) progressFill.style.height = `${progressPercent}%`;
     if (progressPop) progressPop.textContent = `${progressPercent}%`;
@@ -1992,6 +2341,67 @@ function updateTrainingUI() {
     if (gameSecondaryLabel) gameSecondaryLabel.textContent = gameHud.secondaryLabel;
     if (gameSecondaryValue) gameSecondaryValue.textContent = gameHud.secondaryValue;
     if (gameStatusText) gameStatusText.textContent = gameHud.statusText;
+
+    if (gameData) {
+        const timingShell = dom.screenRoot.querySelector('.juice-timing-shell');
+        const timingWidth = timingShell ? timingShell.clientWidth : 600;
+        const timingHeight = timingShell ? timingShell.clientHeight : 150;
+        const markerPoint = getTimingMarkerPosition(gameData.markerProgress, timingWidth, timingHeight);
+        const targetMl = Math.max(1, gameData.targetMl || 150);
+        const cupPercent = clamp((gameData.cupMl / targetMl) * 100, 0, 100);
+
+        if (juiceMarker) {
+            juiceMarker.style.left = `${markerPoint.x}px`;
+            juiceMarker.style.top = `${markerPoint.y}px`;
+            juiceMarker.dataset.zone = gameData.zoneKey || 'bad';
+        }
+        if (juiceCupFill) {
+            juiceCupFill.style.height = `${cupPercent}%`;
+        }
+        if (juiceCupValue) {
+            juiceCupValue.textContent = `${Math.round(gameData.cupMl || 0)} / ${targetMl} ml`;
+        }
+        if (juiceOrderRows.length && Array.isArray(gameData.orders)) {
+            juiceOrderRows.forEach((row) => {
+                const index = Number(row.dataset.orderIndex);
+                const order = gameData.orders[index];
+                if (!order) return;
+                const progressElement = row.querySelector('[data-order-progress]');
+                const zoneElement = row.querySelector('[data-order-zone]');
+                const isActive = index === gameData.activeOrderIndex;
+                const isDone = order.status === 'done';
+
+                row.classList.toggle('is-active', isActive);
+                row.classList.toggle('is-muted', !isActive && !isDone);
+                row.classList.toggle('is-done', isDone);
+
+                if (progressElement) {
+                    progressElement.textContent = `${Math.round(clamp(order.progress || 0, 0, 1) * 100)}%`;
+                }
+                if (zoneElement) {
+                    zoneElement.textContent = order.zoneLabel || (isActive ? 'Active' : 'Wait');
+                    zoneElement.dataset.zone = order.zoneKey || 'bad';
+                }
+            });
+        }
+        if (juiceSqueezeState) {
+            juiceSqueezeState.textContent = gameData.isSqueezing ? 'Squeezing' : 'Released';
+            juiceSqueezeState.classList.toggle('is-active', Boolean(gameData.isSqueezing));
+        }
+        if (juiceTargetCard) {
+            juiceTargetCard.classList.toggle('is-dripping', Boolean(gameData.isSqueezing));
+        }
+        if (juiceResultPopup && gameData.resultPopup) {
+            juiceResultPopup.classList.toggle('is-visible', Boolean(gameData.resultPopup.visible));
+            juiceResultPopup.dataset.zone = gameData.resultPopup.zoneKey || 'bad';
+            if (juiceResultTitle) {
+                juiceResultTitle.textContent = gameData.resultPopup.title || '';
+            }
+            if (juiceResultDetail) {
+                juiceResultDetail.textContent = gameData.resultPopup.detail || '';
+            }
+        }
+    }
 }
 
 function drawOverlay() {
@@ -2115,6 +2525,21 @@ window.addEventListener('resize', () => {
 async function init() {
     render();
     await fetchExercises();
+
+    if (DEV_AUTOSTART_GAME_MODE) {
+        const exercise5Index = appState.exercises.findIndex((exercise) => exercise.id === 5);
+        if (exercise5Index >= 0 && exercise5Index !== appState.exerciseIndex) {
+            appState.exerciseIndex = exercise5Index;
+            await loadCurrentExerciseAssets();
+        }
+
+        await startCamera();
+        if (appState.cameraRunning && appState.referenceData && appState.guideFrames.length) {
+            startTrainingSession('game');
+            return;
+        }
+    }
+
     render();
 }
 
