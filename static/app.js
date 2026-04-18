@@ -33,7 +33,7 @@ const FINGER_POINTS = {
 
 const EXERCISE_COPY = {
     1: {
-        label: 'Level 1 - Finger Precision',
+        label: 'Game Mode A',
         overview: 'Touch the thumb to each fingertip, then reopen into a relaxed spread before the next contact.',
         guidance: 'Move thumb-to-finger slowly. Watch the reference clip first, then hold each clean contact briefly so the system can confirm it.',
         tips: [
@@ -42,38 +42,8 @@ const EXERCISE_COPY = {
             'Keep the wrist quiet while the fingertips change shape.',
         ],
     },
-    2: {
-        label: 'Level 1 - Wrist Control',
-        overview: 'Guide the wrist through gentle extension and flexion while keeping the fingers relaxed and visible.',
-        guidance: 'Follow the reference clip from neutral into the target angle. Small errors are okay as long as the wrist moves in the correct direction.',
-        tips: [
-            'Lead from the wrist instead of curling the fingers.',
-            'Keep the palm centered in the frame while rotating.',
-            'Hold the target briefly once the live cue says the checkpoint is aligned.',
-        ],
-    },
-    3: {
-        label: 'Level 2 - Hand Circuit',
-        overview: 'Cycle through multiple hand shapes in order and let the guide checkpoints pace the sequence.',
-        guidance: 'The sequence advances once your live hand is close enough to the next reference pose, so move steadily rather than rushing.',
-        tips: [
-            'Return to a clear, stable hand shape before changing speed.',
-            'Watch the cue text for which finger needs the most correction.',
-            'If you drift off screen, the session pauses automatically.',
-        ],
-    },
-    4: {
-        label: 'Level 1 - Stretch',
-        overview: 'Open the palm, lengthen the fingers, and match the target spread without locking the joints.',
-        guidance: 'Aim for the broad shape of the hand. The scoring system leaves room for small angle differences.',
-        tips: [
-            'Spread from the knuckles instead of forcing the fingertips.',
-            'Keep the palm visible and level to the camera.',
-            'Use the progress rail to see how many checkpoints remain.',
-        ],
-    },
     5: {
-        label: 'Level 2 - Strengthening',
+        label: 'Game Mode B',
         overview: 'Move through controlled closing and opening patterns while maintaining clear hand visibility for tracking.',
         guidance: 'Use the reference clip for pacing, then refine the weakest finger shown in the live cue until the hold meter fills.',
         tips: [
@@ -106,6 +76,13 @@ const SPREAD_SCORE_DECAY = 0.11;
 const POSE_SHAPE_DECAY = 0.34;
 const PROCESSING_FRAME_MS = 48;
 const MATCH_SEARCH_AHEAD = 8;
+const FALLBACK_GAME_HUD = {
+    primaryLabel: 'Mode Score',
+    primaryValue: '0',
+    secondaryLabel: 'Objective',
+    secondaryValue: 'Follow guide checkpoints',
+    statusText: 'Gamification scaffold active',
+};
 
 const appState = {
     exercises: [],
@@ -148,6 +125,55 @@ const dom = {
     navItems: Array.from(document.querySelectorAll('[data-nav]')),
 };
 
+function createFallbackGameRuntime(exercise) {
+    const modeTitle = exercise && exercise.id === 5 ? 'Game Mode B (Fallback)' : 'Game Mode A (Fallback)';
+    return {
+        modeId: 'fallback_mode',
+        modeTitle,
+        notifySessionStart() {},
+        notifyFrame() {},
+        notifyCheckpoint() {},
+        notifyPause() {},
+        notifyResume() {},
+        notifySessionEnd() {},
+        snapshot() {
+            return {
+                modeId: 'fallback_mode',
+                modeTitle,
+                hud: { ...FALLBACK_GAME_HUD },
+                summary: null,
+            };
+        },
+    };
+}
+
+function createGameRuntime(exercise) {
+    if (!exercise) {
+        return createFallbackGameRuntime(null);
+    }
+
+    if (window.BlueprintGamification && typeof window.BlueprintGamification.createRuntime === 'function') {
+        return window.BlueprintGamification.createRuntime(exercise.id, {
+            exerciseId: exercise.id,
+            exerciseName: exercise.name,
+        });
+    }
+
+    return createFallbackGameRuntime(exercise);
+}
+
+function syncTrainingGameSnapshot(training) {
+    if (!training || !training.gameRuntime || typeof training.gameRuntime.snapshot !== 'function') {
+        return;
+    }
+
+    const snapshot = training.gameRuntime.snapshot() || {};
+    training.gameModeId = snapshot.modeId || training.gameModeId || 'unknown_mode';
+    training.gameModeTitle = snapshot.modeTitle || training.gameModeTitle || 'Unknown Mode';
+    training.gameHud = { ...FALLBACK_GAME_HUD, ...(snapshot.hud || {}) };
+    training.gameSummary = snapshot.summary || null;
+}
+
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
@@ -185,7 +211,8 @@ function getCompletionPercent(guideIndex) {
     return Math.round((guideIndex / getGuideCount()) * 100);
 }
 
-function advanceTrainingGuide(training, score, nextGuideIndex, now) {
+function advanceTrainingGuide(training, score, nextGuideIndex, now, context = {}) {
+    const previousGuideIndex = training.guideIndex;
     training.checkpointScores.push(score);
     training.guideIndex = Math.min(nextGuideIndex, appState.guideFrames.length);
     training.matchStartedAt = 0;
@@ -194,6 +221,17 @@ function advanceTrainingGuide(training, score, nextGuideIndex, now) {
     training.softMatchGuideIndex = null;
     training.holdProgress = 0;
     training.lastAdvanceAt = now;
+
+    if (training.gameRuntime && typeof training.gameRuntime.notifyCheckpoint === 'function') {
+        training.gameRuntime.notifyCheckpoint({
+            ...context,
+            previousGuideIndex,
+            nextGuideIndex: training.guideIndex,
+            score,
+            completionPercent: getCompletionPercent(training.guideIndex),
+        });
+        syncTrainingGameSnapshot(training);
+    }
 
     return training.guideIndex >= appState.guideFrames.length;
 }
@@ -544,6 +582,8 @@ function renderTrainingScreen() {
     const completed = training ? training.guideIndex : 0;
     const progressPercent = getCompletionPercent(completed);
     const currentCue = training ? training.cueText : 'Match the next pose.';
+    const gameModeTitle = training ? training.gameModeTitle : 'Mode';
+    const gameHud = training ? training.gameHud : FALLBACK_GAME_HUD;
 
     return `
         <section class="screen training-screen">
@@ -580,6 +620,21 @@ function renderTrainingScreen() {
                                 <strong id="trainingCueHeading">Live guidance</strong>
                                 <p id="trainingCueTitle">${currentCue}</p>
                                 <span id="trainingCueText">Watch the instruction clip first, then use the live cue to refine the weakest finger or wrist position.</span>
+                            </div>
+
+                            <div class="training-game-hud">
+                                <strong id="trainingGameModeTitle">${gameModeTitle}</strong>
+                                <div class="training-game-grid">
+                                    <div>
+                                        <span id="trainingGamePrimaryLabel">${gameHud.primaryLabel}</span>
+                                        <b id="trainingGamePrimaryValue">${gameHud.primaryValue}</b>
+                                    </div>
+                                    <div>
+                                        <span id="trainingGameSecondaryLabel">${gameHud.secondaryLabel}</span>
+                                        <b id="trainingGameSecondaryValue">${gameHud.secondaryValue}</b>
+                                    </div>
+                                </div>
+                                <small id="trainingGameStatusText">${gameHud.statusText}</small>
                             </div>
 
                             <div class="training-edge-note">Withdraw hand to pause session</div>
@@ -683,6 +738,15 @@ function renderSummaryScreen() {
     const completionLabel = summary.completed
         ? 'Completed the full exercise.'
         : `Session ended at ${summary.completionPercent}% completion.`;
+    const gameModeNote = summary.gameModeSummary && summary.gameModeSummary.notes
+        ? summary.gameModeSummary.notes
+        : 'Mode-specific scoring logic can be implemented in static/gamification/index.js.';
+    const gameBadge = summary.gameModeSummary && summary.gameModeSummary.badge
+        ? summary.gameModeSummary.badge
+        : 'Scaffold';
+    const gameModeScore = summary.gameModeSummary && Number.isFinite(summary.gameModeSummary.modeScore)
+        ? summary.gameModeSummary.modeScore
+        : 0;
 
     return `
         <section class="screen summary-shell">
@@ -710,6 +774,11 @@ function renderSummaryScreen() {
                         <strong>Total Time</strong>
                         <div class="metric-value">${summary.durationLabel}<small>mm:ss</small></div>
                         <div class="metric-footer">${summary.pauseLabel}</div>
+                    </div>
+                    <div class="metric-card">
+                        <strong>${summary.gameModeTitle || 'Game Mode'}</strong>
+                        <div class="metric-value">${gameModeScore}<small>pts</small></div>
+                        <div class="metric-footer">${gameBadge} - ${gameModeNote}</div>
                     </div>
                 </div>
 
@@ -981,14 +1050,16 @@ function startTrainingSession() {
     }
 
     const exercise = getCurrentExercise();
+    const gameRuntime = createGameRuntime(exercise);
+    const sessionStartedAt = performance.now();
     appState.training = {
         exerciseId: exercise.id,
-        activeStartedAt: performance.now(),
+        activeStartedAt: sessionStartedAt,
         activeElapsedMs: 0,
         pauseCount: 0,
         guideIndex: 0,
         guideWindowMs: Math.max(1200, Math.round((exercise.duration * 1000) / getGuideCount())),
-        lastAdvanceAt: performance.now(),
+        lastAdvanceAt: sessionStartedAt,
         matchStartedAt: 0,
         matchGuideIndex: null,
         softMatchStartedAt: 0,
@@ -1006,7 +1077,19 @@ function startTrainingSession() {
         handLossStartedAt: 0,
         fingerTotals: { Thumb: 0, Index: 0, Middle: 0, Ring: 0, Pinky: 0 },
         fingerSamples: 0,
+        gameRuntime,
+        gameModeId: gameRuntime.modeId,
+        gameModeTitle: gameRuntime.modeTitle,
+        gameHud: { ...FALLBACK_GAME_HUD },
+        gameSummary: null,
+        lastFrameAt: sessionStartedAt,
     };
+    appState.training.gameRuntime.notifySessionStart({
+        exerciseId: exercise.id,
+        exerciseName: exercise.name,
+        guideCount: getGuideCount(),
+    });
+    syncTrainingGameSnapshot(appState.training);
 
     setScreen('training');
 }
@@ -1019,6 +1102,14 @@ function resumeTraining() {
 
     appState.training.activeStartedAt = performance.now();
     appState.training.handLossStartedAt = 0;
+    appState.training.lastFrameAt = performance.now();
+    if (appState.training.gameRuntime && typeof appState.training.gameRuntime.notifyResume === 'function') {
+        appState.training.gameRuntime.notifyResume({
+            guideIndex: appState.training.guideIndex,
+            completionPercent: getCompletionPercent(appState.training.guideIndex),
+        });
+        syncTrainingGameSnapshot(appState.training);
+    }
     setScreen('training');
 }
 
@@ -1042,12 +1133,31 @@ function pauseTraining() {
     appState.training.softMatchStartedAt = 0;
     appState.training.softMatchGuideIndex = null;
     appState.training.holdProgress = 0;
+    if (appState.training.gameRuntime && typeof appState.training.gameRuntime.notifyPause === 'function') {
+        appState.training.gameRuntime.notifyPause({
+            guideIndex: appState.training.guideIndex,
+            completionPercent: getCompletionPercent(appState.training.guideIndex),
+        });
+        syncTrainingGameSnapshot(appState.training);
+    }
     setScreen('paused');
 }
 
 function finishTraining(completed) {
     if (!appState.training) return;
     stopTrainingTimer();
+
+    if (appState.training.gameRuntime && typeof appState.training.gameRuntime.notifySessionEnd === 'function') {
+        appState.training.gameRuntime.notifySessionEnd({
+            completed,
+            durationMs: appState.training.activeElapsedMs,
+            completionPercent: getCompletionPercent(appState.training.guideIndex),
+            averageAccuracy: average(appState.training.checkpointScores.length
+                ? appState.training.checkpointScores
+                : appState.training.scoreHistory.map((entry) => entry.score)),
+        });
+        syncTrainingGameSnapshot(appState.training);
+    }
 
     const summary = buildSessionSummary(appState.training, completed);
     appState.currentSummary = summary;
@@ -1101,6 +1211,8 @@ function buildSessionSummary(training, completed) {
         dateLabel,
         accuracyTrend,
         stabilityTrend,
+        gameModeTitle: training.gameModeTitle || 'Unknown Mode',
+        gameModeSummary: training.gameSummary || null,
         assessment: buildAssessment({
             averageAccuracy,
             weakestFinger,
@@ -1704,6 +1816,8 @@ function isHandWithdrawn(bounds) {
 function updateTraining(now) {
     const training = appState.training;
     if (!training) return;
+    const deltaSeconds = Math.max(0, (now - (training.lastFrameAt || now)) / 1000);
+    training.lastFrameAt = now;
 
     if (!appState.latestLandmarks || isHandWithdrawn(appState.latestBounds)) {
         if (!training.handLossStartedAt) {
@@ -1780,7 +1894,10 @@ function updateTraining(now) {
         training.holdProgress = clamp((now - training.matchStartedAt) / MATCH_HOLD_MS, 0, 1);
 
         if (training.holdProgress >= 1 && canAdvanceByTime) {
-            if (advanceTrainingGuide(training, result.overall_score, training.guideIndex + 1, now)) {
+            if (advanceTrainingGuide(training, result.overall_score, training.guideIndex + 1, now, {
+                matchScore: match.score,
+                result,
+            })) {
                 finishTraining(true);
                 return;
             }
@@ -1796,7 +1913,10 @@ function updateTraining(now) {
         training.holdProgress = clamp((now - training.softMatchStartedAt) / softHoldMs, 0, 1);
 
         if (training.holdProgress >= 1 && canAdvanceByTime) {
-            if (advanceTrainingGuide(training, result.overall_score, training.guideIndex + 1, now)) {
+            if (advanceTrainingGuide(training, result.overall_score, training.guideIndex + 1, now, {
+                matchScore: match.score,
+                result,
+            })) {
                 finishTraining(true);
                 return;
             }
@@ -1809,11 +1929,27 @@ function updateTraining(now) {
         training.holdProgress = Math.max(0, training.holdProgress - 0.08);
 
         if (match.score >= FORCED_PROGRESS_THRESHOLD && canAdvanceByTime) {
-            if (advanceTrainingGuide(training, result.overall_score, training.guideIndex + 1, now)) {
+            if (advanceTrainingGuide(training, result.overall_score, training.guideIndex + 1, now, {
+                matchScore: match.score,
+                result,
+            })) {
                 finishTraining(true);
                 return;
             }
         }
+    }
+
+    if (training.gameRuntime && typeof training.gameRuntime.notifyFrame === 'function') {
+        training.gameRuntime.notifyFrame({
+            now,
+            deltaSeconds,
+            guideIndex: training.guideIndex,
+            completionPercent: getCompletionPercent(training.guideIndex),
+            holdProgress: training.holdProgress,
+            matchScore: match.score,
+            result,
+        });
+        syncTrainingGameSnapshot(training);
     }
 
     updateTrainingUI();
@@ -1836,6 +1972,13 @@ function updateTrainingUI() {
     const calibration = dom.screenRoot.querySelector('#trainingCalibrationText');
     const cueTitle = dom.screenRoot.querySelector('#trainingCueTitle');
     const cueText = dom.screenRoot.querySelector('#trainingCueText');
+    const gameModeTitle = dom.screenRoot.querySelector('#trainingGameModeTitle');
+    const gamePrimaryLabel = dom.screenRoot.querySelector('#trainingGamePrimaryLabel');
+    const gamePrimaryValue = dom.screenRoot.querySelector('#trainingGamePrimaryValue');
+    const gameSecondaryLabel = dom.screenRoot.querySelector('#trainingGameSecondaryLabel');
+    const gameSecondaryValue = dom.screenRoot.querySelector('#trainingGameSecondaryValue');
+    const gameStatusText = dom.screenRoot.querySelector('#trainingGameStatusText');
+    const gameHud = training.gameHud || FALLBACK_GAME_HUD;
 
     if (progressFill) progressFill.style.height = `${progressPercent}%`;
     if (progressPop) progressPop.textContent = `${progressPercent}%`;
@@ -1843,6 +1986,12 @@ function updateTrainingUI() {
     if (calibration) calibration.textContent = training.calibrationText;
     if (cueTitle) cueTitle.textContent = training.cueText;
     if (cueText) cueText.textContent = training.cueDetail;
+    if (gameModeTitle) gameModeTitle.textContent = training.gameModeTitle || 'Game Mode';
+    if (gamePrimaryLabel) gamePrimaryLabel.textContent = gameHud.primaryLabel;
+    if (gamePrimaryValue) gamePrimaryValue.textContent = gameHud.primaryValue;
+    if (gameSecondaryLabel) gameSecondaryLabel.textContent = gameHud.secondaryLabel;
+    if (gameSecondaryValue) gameSecondaryValue.textContent = gameHud.secondaryValue;
+    if (gameStatusText) gameStatusText.textContent = gameHud.statusText;
 }
 
 function drawOverlay() {

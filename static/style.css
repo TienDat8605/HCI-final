@@ -1065,6 +1065,57 @@ button {
     line-height: 1.55;
 }
 
+.training-game-hud {
+    position: absolute;
+    right: 20px;
+    bottom: 18px;
+    z-index: 2;
+    width: min(330px, calc(100% - 84px));
+    padding: 12px 14px;
+    background: rgba(16, 29, 66, 0.82);
+    color: var(--white);
+    box-shadow: var(--shadow);
+}
+
+.training-game-hud strong {
+    display: block;
+    margin-bottom: 10px;
+    color: var(--secondary-soft);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+}
+
+.training-game-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.training-game-grid span {
+    display: block;
+    color: rgba(223, 252, 255, 0.82);
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+}
+
+.training-game-grid b {
+    display: block;
+    margin-top: 6px;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 1.04rem;
+    letter-spacing: -0.02em;
+}
+
+.training-game-hud small {
+    display: block;
+    margin-top: 10px;
+    color: rgba(223, 252, 255, 0.9);
+    font-size: 0.74rem;
+    line-height: 1.45;
+}
+
 .training-edge-note {
     position: absolute;
     right: 12px;
@@ -1659,6 +1710,12 @@ button {
         position: static;
         margin: 24px;
         max-width: none;
+    }
+
+    .training-game-hud {
+        position: static;
+        margin: 0 24px 24px;
+        width: auto;
     }
 
     .summary-action {

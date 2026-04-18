@@ -15,51 +15,6 @@
     "detection_rate": 71.2
   },
   {
-    "id": 2,
-    "name": "Wrist Movements",
-    "duration": 23,
-    "clip": "exercise_2.mp4",
-    "keyframes": {
-      "start": "exercise_2_start.jpg",
-      "mid": "exercise_2_mid.jpg",
-      "end": "exercise_2_end.jpg"
-    },
-    "landmarks_file": "exercise_2.json",
-    "total_landmark_frames": 230,
-    "frames_with_hands": 189,
-    "detection_rate": 82.2
-  },
-  {
-    "id": 3,
-    "name": "Hand Circuit",
-    "duration": 20,
-    "clip": "exercise_3.mp4",
-    "keyframes": {
-      "start": "exercise_3_start.jpg",
-      "mid": "exercise_3_mid.jpg",
-      "end": "exercise_3_end.jpg"
-    },
-    "landmarks_file": "exercise_3.json",
-    "total_landmark_frames": 201,
-    "frames_with_hands": 160,
-    "detection_rate": 79.6
-  },
-  {
-    "id": 4,
-    "name": "Stretch",
-    "duration": 26,
-    "clip": "exercise_4.mp4",
-    "keyframes": {
-      "start": "exercise_4_start.jpg",
-      "mid": "exercise_4_mid.jpg",
-      "end": "exercise_4_end.jpg"
-    },
-    "landmarks_file": "exercise_4.json",
-    "total_landmark_frames": 260,
-    "frames_with_hands": 218,
-    "detection_rate": 83.8
-  },
-  {
     "id": 5,
     "name": "Strengthening",
     "duration": 38,
