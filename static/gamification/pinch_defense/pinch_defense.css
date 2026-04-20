@@ -18,9 +18,11 @@
 .pinch-legend-card span,
 .pinch-enemy-rules span,
 .pinch-hand-meta span,
-.pinch-defense-banner span,
-.pinch-defense-summary span,
-.pinch-defense-finger span {
+.pinch-defense-finger span,
+.pinch-side-card small,
+.pinch-side-label,
+.pinch-side-metric span,
+.pinch-sequence-empty {
     display: block;
     color: var(--ink-soft);
     font-size: 0.68rem;
@@ -31,9 +33,10 @@
 .pinch-legend-card strong,
 .pinch-enemy-rules strong,
 .pinch-hand-meta strong,
-.pinch-defense-banner strong,
-.pinch-defense-summary b,
-.pinch-defense-finger b {
+.pinch-defense-finger b,
+.pinch-side-card strong,
+.pinch-side-metric b,
+.pinch-sequence-badge b {
     display: block;
     margin-top: 6px;
     font-family: "Space Grotesk", sans-serif;
@@ -101,6 +104,15 @@
     text-transform: uppercase;
 }
 
+.pinch-training-layout {
+    grid-template-columns: 72px minmax(0, 1fr) minmax(240px, 290px);
+    align-items: stretch;
+}
+
+.pinch-training-main {
+    min-width: 0;
+}
+
 .pinch-training-stage-shell {
     background:
         radial-gradient(circle at top right, rgba(59, 130, 246, 0.18), transparent 26%),
@@ -123,37 +135,6 @@
     display: block;
 }
 
-.pinch-defense-banner,
-.pinch-defense-summary {
-    position: absolute;
-    top: 18px;
-    padding: 12px 14px;
-    background: rgba(255, 255, 255, 0.94);
-    box-shadow: var(--shadow);
-}
-
-.pinch-defense-banner {
-    left: 18px;
-    min-width: 220px;
-}
-
-.pinch-defense-banner small {
-    display: block;
-    margin-top: 8px;
-    color: var(--secondary);
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-}
-
-.pinch-defense-summary {
-    right: 18px;
-    display: grid;
-    gap: 10px;
-    min-width: 210px;
-}
-
 .pinch-defense-guide {
     position: absolute;
     left: 18px;
@@ -170,9 +151,18 @@
     border-top: 4px solid var(--finger-color);
     box-shadow: var(--shadow);
     transition: transform var(--transition), box-shadow var(--transition), background var(--transition);
+    text-align: center;
 }
 
-.pinch-defense-finger.is-target {
+.pinch-defense-finger-symbol {
+    display: block;
+    font-size: 1.4rem;
+    line-height: 1;
+    color: var(--finger-color);
+    margin-bottom: 8px;
+}
+
+.pinch-defense-finger.is-confirmed {
     background: var(--finger-glow);
     box-shadow: 0 18px 40px rgba(13, 21, 37, 0.16);
 }
@@ -185,26 +175,148 @@
     outline: 2px dashed rgba(15, 118, 110, 0.36);
 }
 
+.pinch-defense-release-cue {
+    position: absolute;
+    left: 50%;
+    bottom: 112px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.88);
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition), transform var(--transition);
+}
+
+.pinch-defense-release-cue.is-visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-6px);
+}
+
+.pinch-release-hand {
+    width: 22px;
+    height: 22px;
+    border: 3px solid var(--secondary);
+    border-radius: 8px;
+    position: relative;
+}
+
+.pinch-release-hand::before,
+.pinch-release-hand::after {
+    content: "";
+    position: absolute;
+    top: 4px;
+    width: 3px;
+    height: 12px;
+    background: var(--secondary);
+}
+
+.pinch-release-hand::before {
+    left: 5px;
+}
+
+.pinch-release-hand::after {
+    right: 5px;
+}
+
+.pinch-release-arrow {
+    width: 14px;
+    height: 14px;
+    border-top: 3px solid var(--secondary);
+    border-right: 3px solid var(--secondary);
+    animation: pinch-release-pulse 820ms ease-in-out infinite;
+}
+
+.pinch-release-arrow.is-left {
+    transform: rotate(-135deg);
+}
+
+.pinch-release-arrow.is-right {
+    transform: rotate(45deg);
+}
+
+.pinch-side-panel {
+    display: grid;
+    gap: 14px;
+    align-content: start;
+}
+
+.pinch-side-card {
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: var(--shadow);
+}
+
+.pinch-side-card strong {
+    font-size: 1.02rem;
+}
+
+.pinch-side-metric {
+    margin-top: 14px;
+}
+
+.pinch-side-metric b {
+    font-size: 1rem;
+}
+
+.pinch-sequence-row {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.pinch-sequence-badge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgba(16, 29, 66, 0.06);
+    border-left: 4px solid var(--sequence-color);
+}
+
+.pinch-sequence-badge span {
+    font-size: 1.1rem;
+    line-height: 1;
+    color: var(--sequence-color);
+}
+
 .pinch-paused-note {
     display: grid;
     place-items: center;
 }
 
+@keyframes pinch-release-pulse {
+    0%, 100% {
+        opacity: 0.45;
+        transform: scale(0.9);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.08);
+    }
+}
+
 @media (max-width: 1280px) {
-    .pinch-enemy-rules {
+    .pinch-training-layout {
         grid-template-columns: 1fr;
     }
 
-    .pinch-defense-banner,
-    .pinch-defense-summary {
-        position: static;
-        margin: 18px;
+    .pinch-enemy-rules {
+        grid-template-columns: 1fr;
     }
 
     .pinch-defense-guide {
         position: static;
         margin: 0 18px 18px;
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .pinch-side-panel {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
@@ -217,5 +329,9 @@
     .pinch-hand-guide,
     .pinch-hand-guide.is-left {
         flex-direction: column;
+    }
+
+    .pinch-side-panel {
+        grid-template-columns: 1fr;
     }
 }

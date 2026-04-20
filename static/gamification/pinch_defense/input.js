@@ -40,6 +40,7 @@
         const runtime = {
             trackingOk: false,
             waitingForRelease: false,
+            waitingSince: 0,
             candidateFinger: null,
             candidateSince: 0,
             candidateAssisted: false,
@@ -168,8 +169,12 @@
             }
 
             if (runtime.waitingForRelease) {
-                if (runtime.allClearSince && now - runtime.allClearSince >= config.pinch.releaseHoldMs) {
+                if (
+                    (runtime.allClearSince && now - runtime.allClearSince >= config.pinch.releaseHoldMs) ||
+                    (runtime.waitingSince && now - runtime.waitingSince >= config.pinch.forceReleaseMs)
+                ) {
                     runtime.waitingForRelease = false;
+                    runtime.waitingSince = 0;
                     events.push({ type: 'release_confirmed', at: now });
                 }
 
@@ -237,6 +242,7 @@
                 fingerState.lastConfirmedAt = now;
                 runtime.lastConfirmAt = now;
                 runtime.waitingForRelease = true;
+                runtime.waitingSince = now;
                 events.push({
                     type: 'pinch_confirmed',
                     finger: bestCandidate.fingerId,
@@ -258,6 +264,7 @@
         function reset() {
             runtime.trackingOk = false;
             runtime.waitingForRelease = false;
+            runtime.waitingSince = 0;
             runtime.lastConfirmAt = 0;
             runtime.allClearSince = 0;
             resetFingerStates();

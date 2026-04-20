@@ -27,6 +27,13 @@
         ctx.restore();
     }
 
+    function getShapeEntity(shape) {
+        if (shape === 'triangle') return '&#9650;';
+        if (shape === 'square') return '&#9632;';
+        if (shape === 'diamond') return '&#9670;';
+        return '&#9679;';
+    }
+
     function formatClock(ms) {
         const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
         const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
@@ -40,9 +47,8 @@
             root: null,
             canvas: null,
             context: null,
-            banner: null,
             guide: null,
-            summary: null,
+            releaseCue: null,
             lastViewState: null,
         };
 
@@ -186,13 +192,14 @@
                 const fingerState = viewState.detectorStates[fingerId] || {};
                 const classes = [
                     'pinch-defense-finger',
-                    viewState.activeTargetFinger === fingerId ? 'is-target' : '',
                     viewState.activeFinger === fingerId ? 'is-active' : '',
+                    viewState.confirmedFinger === fingerId ? 'is-confirmed' : '',
                     fingerState.assisted ? 'is-assisted' : '',
                 ].filter(Boolean).join(' ');
                 const status = fingerState.state || 'idle';
                 return `
                     <div class="${classes}" style="--finger-color:${fingerConfig.color}; --finger-glow:${fingerConfig.glow};">
+                        <span class="pinch-defense-finger-symbol">${getShapeEntity(fingerConfig.shape)}</span>
                         <span>${fingerConfig.label}</span>
                         <b>${status.toUpperCase()}</b>
                     </div>
@@ -200,35 +207,11 @@
             }).join('');
         }
 
-        function updateBanner(viewState) {
-            if (!runtime.banner) {
+        function updateReleaseCue(viewState) {
+            if (!runtime.releaseCue) {
                 return;
             }
-            runtime.banner.innerHTML = `
-                <strong>${viewState.waveLabel}</strong>
-                <span>${viewState.praiseText}</span>
-                <small>${formatClock(viewState.remainingMs)} remaining</small>
-            `;
-        }
-
-        function updateSummary(viewState) {
-            if (!runtime.summary) {
-                return;
-            }
-            runtime.summary.innerHTML = `
-                <div>
-                    <span>Target Finger</span>
-                    <b>${config.fingers[viewState.activeTargetFinger]?.label || 'Relaxed'}</b>
-                </div>
-                <div>
-                    <span>Accuracy</span>
-                    <b>${viewState.accuracyPercent}%</b>
-                </div>
-                <div>
-                    <span>Combo</span>
-                    <b>${viewState.combo > 1 ? `x${viewState.combo}` : 'Ready'}</b>
-                </div>
-            `;
+            runtime.releaseCue.classList.toggle('is-visible', Boolean(viewState.pendingRelease));
         }
 
         function buildRoot() {
@@ -236,16 +219,18 @@
             root.className = 'pinch-defense-root';
             root.innerHTML = `
                 <canvas class="pinch-defense-canvas"></canvas>
-                <div class="pinch-defense-banner"></div>
                 <div class="pinch-defense-guide"></div>
-                <div class="pinch-defense-summary"></div>
+                <div class="pinch-defense-release-cue" aria-hidden="true">
+                    <span class="pinch-release-arrow is-left"></span>
+                    <span class="pinch-release-hand"></span>
+                    <span class="pinch-release-arrow is-right"></span>
+                </div>
             `;
             runtime.root = root;
             runtime.canvas = root.querySelector('.pinch-defense-canvas');
             runtime.context = runtime.canvas.getContext('2d');
-            runtime.banner = root.querySelector('.pinch-defense-banner');
             runtime.guide = root.querySelector('.pinch-defense-guide');
-            runtime.summary = root.querySelector('.pinch-defense-summary');
+            runtime.releaseCue = root.querySelector('.pinch-defense-release-cue');
         }
 
         function mount(container) {
@@ -280,9 +265,8 @@
             if (!runtime.root) {
                 return;
             }
-            updateBanner(viewState);
             updateGuide(viewState);
-            updateSummary(viewState);
+            updateReleaseCue(viewState);
             drawStage(viewState);
         }
 

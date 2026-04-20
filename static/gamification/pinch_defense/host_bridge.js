@@ -154,14 +154,44 @@
             : 0);
     }
 
+    function getShapeEntity(shape) {
+        if (shape === 'Triangle') return '&#9650;';
+        if (shape === 'Square') return '&#9632;';
+        if (shape === 'Diamond') return '&#9670;';
+        return '&#9679;';
+    }
+
+    function getFingerMeta(fingerId) {
+        return PINCH_DEFENSE_MAP.find((finger) => finger.id === fingerId) || null;
+    }
+
+    function renderSequence(sequence) {
+        if (!sequence || !sequence.length) {
+            return '<div class="pinch-sequence-empty">No target on screen</div>';
+        }
+
+        return `
+            <div class="pinch-sequence-row">
+                ${sequence.map((fingerId) => {
+                    const finger = getFingerMeta(fingerId);
+                    if (!finger) return '';
+                    return `
+                        <div class="pinch-sequence-badge" style="--sequence-color:${finger.color};">
+                            <span>${getShapeEntity(finger.shape)}</span>
+                            <b>${finger.label}</b>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }
+
     function renderTrainingScreen({ exercise, training, progressPercent, currentCue, gameModeTitle, gameHud }) {
-        const trackingText = training && training.gameViewState && training.gameViewState.trackingText
-            ? training.gameViewState.trackingText
-            : 'Scanning live hand';
+        const viewState = training && training.gameViewState ? training.gameViewState : {};
 
         return `
             <section class="screen training-screen pinch-training-screen">
-                <div class="training-layout">
+                <div class="training-layout pinch-training-layout">
                     <aside class="progress-rail">
                         <div class="progress-bar-shell">
                             <div id="trainingProgressFill" class="progress-bar-fill" style="height:${progressPercent}%;">
@@ -174,47 +204,42 @@
                         </div>
                     </aside>
 
-                    <section>
+                    <section class="pinch-training-main">
                         <div class="training-stage-shell pinch-training-stage-shell">
                             <div id="gameMount" class="pinch-defense-stage-mount"></div>
-                            <div class="training-overlay">
-                                <div class="training-head">
-                                    <div>
-                                        <div class="training-subtitle">Battle lane</div>
-                                        <h2 class="training-title">${exercise ? exercise.name : 'Training'}</h2>
-                                    </div>
-                                    <div class="status-box">
-                                        <strong>Tracking Status</strong>
-                                        <span id="trainingCalibrationText">${trackingText}</span>
-                                        <div class="status-caption">Gentle pinches accepted</div>
-                                    </div>
-                                </div>
-
-                                <div class="training-cue">
-                                    <strong id="trainingCueHeading">Live guidance</strong>
-                                    <p id="trainingCueTitle">${currentCue}</p>
-                                    <span id="trainingCueText">Match the enemy symbol, then release before the next sequence step.</span>
-                                </div>
-
-                                <div class="training-game-hud">
-                                    <strong id="trainingGameModeTitle">${gameModeTitle}</strong>
-                                    <div class="training-game-grid">
-                                        <div>
-                                            <span id="trainingGamePrimaryLabel">${gameHud.primaryLabel}</span>
-                                            <b id="trainingGamePrimaryValue">${gameHud.primaryValue}</b>
-                                        </div>
-                                        <div>
-                                            <span id="trainingGameSecondaryLabel">${gameHud.secondaryLabel}</span>
-                                            <b id="trainingGameSecondaryValue">${gameHud.secondaryValue}</b>
-                                        </div>
-                                    </div>
-                                    <small id="trainingGameStatusText">${gameHud.statusText}</small>
-                                </div>
-
-                                <div class="training-edge-note">Withdraw hand to pause session</div>
-                            </div>
                         </div>
                     </section>
+
+                    <aside class="pinch-side-panel">
+                        <div class="pinch-side-card">
+                            <strong id="trainingGameModeTitle">${gameModeTitle}</strong>
+                            <div class="pinch-side-metric">
+                                <span id="trainingGamePrimaryLabel">${gameHud.primaryLabel}</span>
+                                <b id="trainingGamePrimaryValue">${gameHud.primaryValue}</b>
+                            </div>
+                            <div class="pinch-side-metric">
+                                <span id="trainingGameSecondaryLabel">${gameHud.secondaryLabel}</span>
+                                <b id="trainingGameSecondaryValue">${gameHud.secondaryValue}</b>
+                            </div>
+                            <div class="pinch-side-metric">
+                                <span>Accuracy</span>
+                                <b>${viewState.accuracyPercent || 0}%</b>
+                            </div>
+                            <small id="trainingGameStatusText">${gameHud.statusText}</small>
+                        </div>
+
+                        <div class="pinch-side-card">
+                            <span class="pinch-side-label">Front Enemy</span>
+                            <strong>${viewState.frontEnemyLabel || 'No target'}</strong>
+                            ${renderSequence(viewState.frontEnemySequence)}
+                        </div>
+
+                        <div class="pinch-side-card">
+                            <span class="pinch-side-label">Tracking</span>
+                            <strong id="trainingCalibrationText">${viewState.trackingText || 'Scanning live hand'}</strong>
+                            <small>${currentCue}</small>
+                        </div>
+                    </aside>
                 </div>
             </section>
         `;

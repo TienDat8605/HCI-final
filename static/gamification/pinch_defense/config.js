@@ -9,7 +9,7 @@
             glow: 'rgba(59, 130, 246, 0.34)',
             shape: 'circle',
             tipIndex: 8,
-            pinchThreshold: 0.42,
+            pinchThreshold: 0.24,
         },
         middle: {
             id: 'middle',
@@ -18,7 +18,7 @@
             glow: 'rgba(34, 197, 94, 0.34)',
             shape: 'triangle',
             tipIndex: 12,
-            pinchThreshold: 0.44,
+            pinchThreshold: 0.25,
         },
         ring: {
             id: 'ring',
@@ -27,7 +27,7 @@
             glow: 'rgba(250, 204, 21, 0.34)',
             shape: 'square',
             tipIndex: 16,
-            pinchThreshold: 0.47,
+            pinchThreshold: 0.265,
         },
         pinky: {
             id: 'pinky',
@@ -36,7 +36,7 @@
             glow: 'rgba(239, 68, 68, 0.34)',
             shape: 'diamond',
             tipIndex: 20,
-            pinchThreshold: 0.5,
+            pinchThreshold: 0.28,
         },
     };
 
@@ -102,7 +102,7 @@
         sessionDurationMs: 180000,
         pauseThresholdMs: 800,
         comboWindowMs: 3000,
-        playerMaxHp: 5,
+        playerMaxHp: 100,
         enemyStartX: 1.02,
         playerX: 0.18,
         maxActiveEnemies: MAX_ACTIVE_ENEMIES,
@@ -115,13 +115,14 @@
         enemyTypes: ENEMY_TYPES,
         waves: WAVES,
         pinch: {
-            approachBuffer: 0.12,
-            releaseBuffer: 0.1,
-            relaxedBuffer: 0.05,
-            confirmHoldMs: 160,
-            relaxedHoldMs: 220,
-            releaseHoldMs: 120,
-            interConfirmGapMs: 220,
+            approachBuffer: 0.09,
+            releaseBuffer: 0.07,
+            relaxedBuffer: 0.045,
+            confirmHoldMs: 105,
+            relaxedHoldMs: 150,
+            releaseHoldMs: 70,
+            interConfirmGapMs: 110,
+            forceReleaseMs: 750,
             ambiguityMargin: 0.03,
         },
     };

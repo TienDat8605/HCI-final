@@ -96,6 +96,7 @@
             trackingInterruptions: 0,
             currentFocusFinger: config.fingerOrder[0],
             activeFinger: null,
+            confirmedFinger: null,
             currentWaveLabel: 'Wave 1',
             praiseText: 'Ready',
             statusText: 'Prepare your thumb and fingertips.',
@@ -223,6 +224,8 @@
         function applyPinch(fingerId, nowMs) {
             state.confirmedAttempts += 1;
             state.activeFinger = fingerId;
+            state.confirmedFinger = fingerId;
+            state.pendingRelease = true;
             const matchingEnemies = state.activeEnemies.filter((enemy) => enemy.sequence[enemy.currentStep] === fingerId);
             const wasCorrect = matchingEnemies.length > 0;
 
@@ -367,12 +370,15 @@
             const detectorOutput = detector.update(frame);
             state.detectorStates = detectorOutput.states;
             state.lastTrackingOk = detectorOutput.trackingOk;
+            state.activeFinger = detectorOutput.activeFinger;
 
             detectorOutput.events.forEach((event) => {
                 if (event.type === 'pinch_confirmed') {
                     applyPinch(event.finger, nowMs);
                 } else if (event.type === 'release_confirmed') {
                     state.pendingRelease = false;
+                    state.confirmedFinger = null;
+                    state.activeFinger = null;
                 } else if (event.type === 'tracking_lost') {
                     state.statusText = 'Tracking drifting. Hold position or pause will trigger.';
                 } else if (event.type === 'tracking_restored') {
@@ -459,6 +465,9 @@
 
         function getViewState() {
             const hearts = Array.from({ length: config.playerMaxHp }, (_, index) => index < state.hp);
+            const frontEnemy = state.activeEnemies.length
+                ? state.activeEnemies.slice().sort((left, right) => left.x - right.x)[0]
+                : null;
             return {
                 progressPercent: Math.round((state.enemiesDefeated / Math.max(1, state.totalEnemies)) * 100),
                 score: state.score,
@@ -476,6 +485,7 @@
                 trackingText: state.lastTrackingOk ? 'Hand tracking stable' : 'Tracking lost',
                 activeTargetFinger: state.currentFocusFinger,
                 activeFinger: state.activeFinger,
+                confirmedFinger: state.confirmedFinger,
                 handedness: state.handedness,
                 enemies: state.activeEnemies.map((enemy) => ({
                     id: enemy.id,
@@ -490,6 +500,9 @@
                 })),
                 detectorStates: state.detectorStates,
                 trackingWarning: !state.lastTrackingOk,
+                pendingRelease: state.pendingRelease,
+                frontEnemyLabel: frontEnemy ? frontEnemy.label : '',
+                frontEnemySequence: frontEnemy ? frontEnemy.sequence.slice(frontEnemy.currentStep) : [],
                 finishRequested: state.finishRequested,
                 completed: state.completed,
                 accuracyPercent: state.confirmedAttempts
