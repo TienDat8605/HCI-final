@@ -3,6 +3,7 @@
     "id": 1,
     "name": "Finger Opposition",
     "duration": 16,
+    "interaction_mode": "guided",
     "clip": "exercise_1.mp4",
     "keyframes": {
       "start": "exercise_1_start.jpg",
@@ -18,6 +19,7 @@
     "id": 5,
     "name": "Strengthening",
     "duration": 38,
+    "interaction_mode": "guided",
     "clip": "exercise_5.mp4",
     "keyframes": {
       "start": "exercise_5_start.jpg",
@@ -28,5 +30,16 @@
     "total_landmark_frames": 380,
     "frames_with_hands": 341,
     "detection_rate": 89.7
+  },
+  {
+    "id": 6,
+    "name": "Pinch Defense",
+    "duration": 180,
+    "interaction_mode": "pinch_defense",
+    "session_duration_seconds": 180,
+    "overview": "A lane-defense rehab mode driven by thumb-to-fingertip pinch input.",
+    "difficulty": "Adaptive",
+    "landmarks_file": null,
+    "clip": null
   }
 ]

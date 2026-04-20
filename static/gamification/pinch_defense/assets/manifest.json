@@ -1,0 +1,8 @@
+{
+  "assets": {
+    "wizard": "wizard.svg",
+    "ghost": "ghost.svg",
+    "slime": "slime.svg",
+    "skull": "skull.svg"
+  }
+}

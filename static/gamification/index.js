@@ -26,6 +26,7 @@
                         badge: 'Scaffold',
                         notes: `TODO: implement mode logic for ${modeId}.`,
                     },
+                    viewState: null,
                 };
             },
             onSessionStart(state, context) {
@@ -54,6 +55,7 @@
     const MODE_BY_EXERCISE = {
         1: 'exercise_1_mode',
         5: 'exercise_5_mode',
+        6: 'pinch_defense_mode',
     };
 
     function getModeRegistry() {
@@ -72,6 +74,8 @@
             onPause: modeDefinition.onPause || fallback.onPause,
             onResume: modeDefinition.onResume || fallback.onResume,
             onSessionEnd: modeDefinition.onSessionEnd || fallback.onSessionEnd,
+            mount: modeDefinition.mount || null,
+            unmount: modeDefinition.unmount || null,
         };
     }
 
@@ -112,6 +116,26 @@
             notifySessionEnd(payload) {
                 callSafe('onSessionEnd', payload);
             },
+            mount(container) {
+                if (typeof mode.mount !== 'function') {
+                    return;
+                }
+                try {
+                    mode.mount(state, container);
+                } catch (error) {
+                    console.error(`[gamification] ${mode.id}.mount failed`, error);
+                }
+            },
+            unmount() {
+                if (typeof mode.unmount !== 'function') {
+                    return;
+                }
+                try {
+                    mode.unmount(state);
+                } catch (error) {
+                    console.error(`[gamification] ${mode.id}.unmount failed`, error);
+                }
+            },
             snapshot() {
                 return {
                     modeId: mode.id,
@@ -119,6 +143,7 @@
                     modeDescription: mode.description,
                     hud: state.hud || createDefaultHud(),
                     summary: state.summary || null,
+                    viewState: state.viewState || null,
                 };
             },
         };

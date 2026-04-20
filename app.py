@@ -19,10 +19,11 @@ LANDMARKS_DIR = os.path.join(DATA_DIR, "landmarks")
 KEYFRAMES_DIR = os.path.join(DATA_DIR, "keyframes")
 EXERCISES_PATH = os.path.join(DATA_DIR, "exercises.json")
 KEYFRAME_POSITIONS = ("start", "mid", "end")
-SUPPORTED_EXERCISE_IDS = (1, 5)
+SUPPORTED_EXERCISE_IDS = (1, 5, 6)
 EXERCISE_GAME_MODES = {
     1: "exercise_1_mode",
     5: "exercise_5_mode",
+    6: "pinch_defense_mode",
 }
 
 app = Flask(__name__, static_folder=STATIC_DIR)

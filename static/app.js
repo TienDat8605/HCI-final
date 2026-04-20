@@ -57,6 +57,7 @@ const EXERCISE_COPY = {
 const ZONE_HOLD_MS = 2500;
 const MATCH_HOLD_MS = 450;
 const PAUSE_HAND_LOSS_MS = 900;
+const PINCH_DEFENSE_PAUSE_MS = 800;
 const SCORE_SAMPLE_MS = 180;
 const PROGRESS_MATCH_THRESHOLD = 40;
 const PROGRESS_SOFT_THRESHOLD = 20;
@@ -97,6 +98,8 @@ const appState = {
     lastHandsSentAt: 0,
     latestLandmarks: null,
     latestBounds: null,
+    latestHandedness: 'Right',
+    mountedGameRuntime: null,
     zone: {
         current: null,
         enteredAt: 0,
@@ -126,7 +129,9 @@ const dom = {
 };
 
 function createFallbackGameRuntime(exercise) {
-    const modeTitle = exercise && exercise.id === 5 ? 'Game Mode B (Fallback)' : 'Game Mode A (Fallback)';
+    const modeTitle = exercise && exercise.id === 6
+        ? 'Pinch Defense (Fallback)'
+        : (exercise && exercise.id === 5 ? 'Game Mode B (Fallback)' : 'Game Mode A (Fallback)');
     return {
         modeId: 'fallback_mode',
         modeTitle,
@@ -136,15 +141,26 @@ function createFallbackGameRuntime(exercise) {
         notifyPause() {},
         notifyResume() {},
         notifySessionEnd() {},
+        mount() {},
+        unmount() {},
         snapshot() {
             return {
                 modeId: 'fallback_mode',
                 modeTitle,
                 hud: { ...FALLBACK_GAME_HUD },
                 summary: null,
+                viewState: null,
             };
         },
     };
+}
+
+function getExerciseInteractionMode(exercise) {
+    return exercise && exercise.interaction_mode === 'pinch_defense' ? 'pinch_defense' : 'guided';
+}
+
+function isPinchDefenseExercise(exercise = getCurrentExercise()) {
+    return getExerciseInteractionMode(exercise) === 'pinch_defense';
 }
 
 function createGameRuntime(exercise) {
@@ -172,6 +188,7 @@ function syncTrainingGameSnapshot(training) {
     training.gameModeTitle = snapshot.modeTitle || training.gameModeTitle || 'Unknown Mode';
     training.gameHud = { ...FALLBACK_GAME_HUD, ...(snapshot.hud || {}) };
     training.gameSummary = snapshot.summary || null;
+    training.gameViewState = snapshot.viewState || null;
 }
 
 function clamp(value, min, max) {
@@ -251,16 +268,18 @@ function getExerciseCopy(exercise) {
         };
     }
 
-    const fallback = {
-        label: `Guided Session - Exercise ${exercise.id}`,
-        overview: `${exercise.name} uses reference landmarks and instruction-video checkpoints instead of strict frame matching.`,
-        guidance: 'Follow the reference clip, hold briefly when the pose matches, and let the system advance at your pace.',
-        tips: [
-            'Keep the hand centered and fully visible.',
-            'Match the overall hand shape before refining finger detail.',
-            'Withdraw the hand if you need to pause.',
-        ],
-    };
+    const fallback = getExerciseInteractionMode(exercise) === 'pinch_defense'
+        ? window.PinchDefenseHost.getExerciseCopyFallback(exercise)
+        : {
+            label: `Guided Session - Exercise ${exercise.id}`,
+            overview: `${exercise.name} uses reference landmarks and instruction-video checkpoints instead of strict frame matching.`,
+            guidance: 'Follow the reference clip, hold briefly when the pose matches, and let the system advance at your pace.',
+            tips: [
+                'Keep the hand centered and fully visible.',
+                'Match the overall hand shape before refining finger detail.',
+                'Withdraw the hand if you need to pause.',
+            ],
+        };
 
     return { ...fallback, ...(EXERCISE_COPY[exercise.id] || {}) };
 }
@@ -271,7 +290,7 @@ function updateShell() {
 
     const exercise = getCurrentExercise();
     dom.exerciseMetaTag.textContent = exercise
-        ? `${exercise.name} - ${exercise.duration}s`
+        ? `${exercise.name} - ${(exercise.session_duration_seconds || exercise.duration)}s`
         : 'Waiting for exercise data';
 
     const navMap = {
@@ -291,6 +310,10 @@ function updateShell() {
 
 function getScreenZoneConfig() {
     const hasAnySummary = Boolean(appState.training || appState.currentSummary || appState.lastSessionSummary);
+    const currentExercise = getCurrentExercise();
+    const canStartInstructions = currentExercise
+        ? (isPinchDefenseExercise(currentExercise) || Boolean(appState.referenceData && appState.guideFrames.length))
+        : false;
 
     switch (appState.screen) {
         case 'zones':
@@ -304,7 +327,7 @@ function getScreenZoneConfig() {
             return {
                 top: { enabled: Boolean(appState.lastSessionSummary), label: 'Summary', description: 'Open the latest completed summary.' },
                 left: { enabled: appState.exercises.length > 1, label: 'Previous', description: 'Hold on your left side to switch to the previous exercise.' },
-                center: { enabled: Boolean(appState.referenceData && appState.guideFrames.length), label: 'Start', description: 'Begin the live training view.' },
+                center: { enabled: canStartInstructions, label: 'Start', description: 'Begin the live training view.' },
                 right: { enabled: appState.exercises.length > 1, label: 'Next', description: 'Hold on your right side to switch to the next exercise.' },
             };
         case 'paused':
@@ -497,10 +520,21 @@ function renderZonesScreen() {
 function renderInstructionScreen() {
     const exercise = getCurrentExercise();
     const copy = getExerciseCopy(exercise);
+    const isPinchDefense = isPinchDefenseExercise(exercise);
     const hasGuidance = Boolean(appState.referenceData && appState.guideFrames.length);
     const hasVideo = Boolean(exercise && exercise.video_ready);
     const showWarning = exercise && (!exercise.landmarks_ready || !exercise.video_ready);
     const zoneConfig = getScreenZoneConfig();
+
+    if (isPinchDefense) {
+        return window.PinchDefenseHost.renderInstructionScreen({
+            exercise,
+            copy,
+            zoneConfig,
+            handedness: appState.latestHandedness,
+            zoneMarkup,
+        });
+    }
 
     return `
         <section class="screen instructions-screen">
@@ -576,14 +610,43 @@ function renderInstructionScreen() {
     `;
 }
 
+function getTrainingProgressPercent(training) {
+    if (!training) return 0;
+    if (training.interactionMode === 'pinch_defense') {
+        return window.PinchDefenseHost.getTrainingProgressPercent(training);
+    }
+    return getCompletionPercent(training.guideIndex);
+}
+
+function getTrainingAccuracy(training) {
+    if (!training) return 0;
+    if (training.interactionMode === 'pinch_defense') {
+        return window.PinchDefenseHost.getTrainingAccuracy(training);
+    }
+    return training.scoreHistory.length
+        ? Math.round(training.scoreHistory[training.scoreHistory.length - 1].score)
+        : 0;
+}
+
 function renderTrainingScreen() {
     const exercise = getCurrentExercise();
     const training = appState.training;
-    const completed = training ? training.guideIndex : 0;
-    const progressPercent = getCompletionPercent(completed);
+    const progressPercent = training ? getTrainingProgressPercent(training) : 0;
     const currentCue = training ? training.cueText : 'Match the next pose.';
     const gameModeTitle = training ? training.gameModeTitle : 'Mode';
     const gameHud = training ? training.gameHud : FALLBACK_GAME_HUD;
+    const isPinchDefense = training && training.interactionMode === 'pinch_defense';
+
+    if (isPinchDefense) {
+        return window.PinchDefenseHost.renderTrainingScreen({
+            exercise,
+            training,
+            progressPercent,
+            currentCue,
+            gameModeTitle,
+            gameHud,
+        });
+    }
 
     return `
         <section class="screen training-screen">
@@ -648,12 +711,20 @@ function renderTrainingScreen() {
 
 function renderPausedScreen() {
     const training = appState.training;
-    const completed = training ? training.guideIndex : 0;
-    const latestScore = training && training.scoreHistory.length
-        ? Math.round(training.scoreHistory[training.scoreHistory.length - 1].score)
-        : 0;
+    const progressPercent = training ? getTrainingProgressPercent(training) : 0;
+    const latestScore = getTrainingAccuracy(training);
     const exercise = getCurrentExercise();
     const hasVideo = Boolean(exercise && exercise.video_ready);
+    const isPinchDefense = training && training.interactionMode === 'pinch_defense';
+
+    if (isPinchDefense) {
+        return window.PinchDefenseHost.renderPausedScreen({
+            training,
+            progressPercent,
+            latestScore,
+            elapsedLabel: training ? formatDuration(getTrainingElapsedMs()) : '00:00',
+        });
+    }
 
     return `
         <section class="screen paused-shell">
@@ -676,7 +747,7 @@ function renderPausedScreen() {
                         <strong>Current Progress</strong>
                         <div class="paused-metric">
                             <span>Progress</span>
-                            <b>${getCompletionPercent(completed)}%</b>
+                            <b>${progressPercent}%</b>
                         </div>
                         <div class="paused-metric">
                             <span>Live Accuracy</span>
@@ -947,7 +1018,7 @@ async function loadCurrentExerciseAssets() {
 
     setReferenceVideoSource(exercise);
 
-    if (exercise.landmarks_ready) {
+    if (getExerciseInteractionMode(exercise) === 'guided' && exercise.landmarks_ready) {
         try {
             const response = await fetch(`/api/landmarks/${exercise.id}`);
             if (!response.ok) {
@@ -1044,15 +1115,18 @@ function buildGuideFrames(referenceData) {
 }
 
 function startTrainingSession() {
-    if (!appState.referenceData || !appState.guideFrames.length) {
+    const exercise = getCurrentExercise();
+    const interactionMode = getExerciseInteractionMode(exercise);
+
+    if (interactionMode === 'guided' && (!appState.referenceData || !appState.guideFrames.length)) {
         showToast('Training needs reference landmarks. Generate data/landmarks first.');
         return;
     }
 
-    const exercise = getCurrentExercise();
     const gameRuntime = createGameRuntime(exercise);
     const sessionStartedAt = performance.now();
     appState.training = {
+        interactionMode,
         exerciseId: exercise.id,
         activeStartedAt: sessionStartedAt,
         activeElapsedMs: 0,
@@ -1082,14 +1156,24 @@ function startTrainingSession() {
         gameModeTitle: gameRuntime.modeTitle,
         gameHud: { ...FALLBACK_GAME_HUD },
         gameSummary: null,
+        gameViewState: null,
         lastFrameAt: sessionStartedAt,
     };
     appState.training.gameRuntime.notifySessionStart({
         exerciseId: exercise.id,
         exerciseName: exercise.name,
         guideCount: getGuideCount(),
+        sessionDurationMs: (exercise.session_duration_seconds || exercise.duration) * 1000,
+        interactionMode,
+        handedness: appState.latestHandedness,
     });
     syncTrainingGameSnapshot(appState.training);
+
+    if (interactionMode === 'pinch_defense') {
+        appState.training.cueText = 'Defend the lane with clean pinches.';
+        appState.training.cueDetail = 'Match the front enemy symbol, then release before the next step.';
+        appState.training.calibrationText = 'Hand tracking stable';
+    }
 
     setScreen('training');
 }
@@ -1106,7 +1190,7 @@ function resumeTraining() {
     if (appState.training.gameRuntime && typeof appState.training.gameRuntime.notifyResume === 'function') {
         appState.training.gameRuntime.notifyResume({
             guideIndex: appState.training.guideIndex,
-            completionPercent: getCompletionPercent(appState.training.guideIndex),
+            completionPercent: getTrainingProgressPercent(appState.training),
         });
         syncTrainingGameSnapshot(appState.training);
     }
@@ -1136,7 +1220,7 @@ function pauseTraining() {
     if (appState.training.gameRuntime && typeof appState.training.gameRuntime.notifyPause === 'function') {
         appState.training.gameRuntime.notifyPause({
             guideIndex: appState.training.guideIndex,
-            completionPercent: getCompletionPercent(appState.training.guideIndex),
+            completionPercent: getTrainingProgressPercent(appState.training),
         });
         syncTrainingGameSnapshot(appState.training);
     }
@@ -1151,7 +1235,7 @@ function finishTraining(completed) {
         appState.training.gameRuntime.notifySessionEnd({
             completed,
             durationMs: appState.training.activeElapsedMs,
-            completionPercent: getCompletionPercent(appState.training.guideIndex),
+            completionPercent: getTrainingProgressPercent(appState.training),
             averageAccuracy: average(appState.training.checkpointScores.length
                 ? appState.training.checkpointScores
                 : appState.training.scoreHistory.map((entry) => entry.score)),
@@ -1183,11 +1267,23 @@ function openSummary(preferCurrentSession) {
 
 function buildSessionSummary(training, completed) {
     const exercise = getCurrentExercise();
-    const completionPercent = getCompletionPercent(training.guideIndex);
-    const accuracyTrend = compressHistory(training.scoreHistory.map((entry) => entry.score), 12);
-    const stabilityTrend = compressHistory(training.stabilityHistory, 12);
-    const averageAccuracy = Math.round(average(training.checkpointScores.length ? training.checkpointScores : training.scoreHistory.map((entry) => entry.score)));
-    const weakestFinger = findWeakestFinger(training);
+    const isPinchDefense = training.interactionMode === 'pinch_defense';
+    const pinchSummary = isPinchDefense ? (training.gameSummary || {}) : null;
+    const completionPercent = isPinchDefense
+        ? Math.round(pinchSummary.completionPercent || 0)
+        : getCompletionPercent(training.guideIndex);
+    const accuracyTrend = isPinchDefense
+        ? compressHistory(pinchSummary.accuracyTrend || [], 12)
+        : compressHistory(training.scoreHistory.map((entry) => entry.score), 12);
+    const stabilityTrend = isPinchDefense
+        ? compressHistory(pinchSummary.stabilityTrend || [], 12)
+        : compressHistory(training.stabilityHistory, 12);
+    const averageAccuracy = isPinchDefense
+        ? Math.round(pinchSummary.averageAccuracy || 0)
+        : Math.round(average(training.checkpointScores.length ? training.checkpointScores : training.scoreHistory.map((entry) => entry.score)));
+    const weakestFinger = isPinchDefense
+        ? (pinchSummary.weakestFinger || 'Index')
+        : findWeakestFinger(training);
     const dateLabel = new Date().toLocaleDateString(undefined, {
         year: 'numeric',
         month: 'short',
@@ -1204,7 +1300,7 @@ function buildSessionSummary(training, completed) {
         completed,
         completionPercent,
         averageAccuracy: Number.isFinite(averageAccuracy) ? averageAccuracy : 0,
-        bestAccuracy: Math.round(training.bestAccuracy),
+        bestAccuracy: isPinchDefense ? Math.round(pinchSummary.bestAccuracy || 0) : Math.round(training.bestAccuracy),
         weakestFinger,
         durationLabel,
         pauseLabel,
@@ -1213,13 +1309,22 @@ function buildSessionSummary(training, completed) {
         stabilityTrend,
         gameModeTitle: training.gameModeTitle || 'Unknown Mode',
         gameModeSummary: training.gameSummary || null,
-        assessment: buildAssessment({
-            averageAccuracy,
-            weakestFinger,
-            completed,
-            completionPercent,
-            pauseCount: training.pauseCount,
-        }),
+        assessment: isPinchDefense
+            ? window.PinchDefenseHost.buildAssessment({
+                averageAccuracy,
+                weakestFinger,
+                completed,
+                completionPercent,
+                pauseCount: training.pauseCount,
+                gameSummary: training.gameSummary || {},
+            })
+            : buildAssessment({
+                averageAccuracy,
+                weakestFinger,
+                completed,
+                completionPercent,
+                pauseCount: training.pauseCount,
+            }),
     };
 }
 
@@ -1279,7 +1384,8 @@ function mountPersistentMedia() {
     dom.referencePanel.classList.add('is-hidden');
 
     const cameraMount = dom.screenRoot.querySelector('#cameraMount');
-    if (cameraMount && appState.cameraRunning) {
+    const shouldMountCamera = cameraMount && appState.cameraRunning && !(appState.training && appState.training.interactionMode === 'pinch_defense' && appState.screen === 'training');
+    if (shouldMountCamera) {
         cameraMount.appendChild(dom.cameraStage);
         dom.cameraStage.classList.remove('is-hidden');
         dom.cameraStage.dataset.mode = appState.screen === 'paused' ? 'paused' : appState.screen;
@@ -1293,6 +1399,22 @@ function mountPersistentMedia() {
         playReferenceVideo();
     } else {
         dom.referenceVideo.pause();
+    }
+
+    const gameMount = dom.screenRoot.querySelector('#gameMount');
+    const nextRuntime = appState.training && appState.training.gameRuntime && typeof appState.training.gameRuntime.mount === 'function'
+        ? appState.training.gameRuntime
+        : null;
+
+    if (gameMount && nextRuntime) {
+        if (appState.mountedGameRuntime && appState.mountedGameRuntime !== nextRuntime && typeof appState.mountedGameRuntime.unmount === 'function') {
+            appState.mountedGameRuntime.unmount();
+        }
+        nextRuntime.mount(gameMount);
+        appState.mountedGameRuntime = nextRuntime;
+    } else if (appState.mountedGameRuntime && typeof appState.mountedGameRuntime.unmount === 'function') {
+        appState.mountedGameRuntime.unmount();
+        appState.mountedGameRuntime = null;
     }
 }
 
@@ -1366,9 +1488,18 @@ function getHandArea(landmarks) {
     return Math.max(0.0001, (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY));
 }
 
+function getHandednessLabel(entry) {
+    if (!entry) return 'Right';
+    if (Array.isArray(entry) && entry.length) {
+        return getHandednessLabel(entry[0]);
+    }
+    const label = entry.label || entry.categoryName || entry.displayName || entry.classification?.[0]?.label;
+    return label === 'Left' ? 'Left' : 'Right';
+}
+
 function selectActiveHand(results) {
     const hands = results.multiHandLandmarks || [];
-    if (!hands.length) return { landmarks: null, bounds: null };
+    if (!hands.length) return { landmarks: null, bounds: null, handedness: null };
 
     let bestIndex = 0;
     let bestArea = -1;
@@ -1383,6 +1514,7 @@ function selectActiveHand(results) {
     return {
         landmarks: hands[bestIndex].map((point) => ({ x: point.x, y: point.y, z: point.z || 0 })),
         bounds: getBounds(hands[bestIndex]),
+        handedness: getHandednessLabel((results.multiHandedness || [])[bestIndex]),
     };
 }
 
@@ -1395,6 +1527,7 @@ function onHandResults(results) {
     if (active.landmarks) {
         appState.latestLandmarks = active.landmarks;
         appState.latestBounds = active.bounds;
+        appState.latestHandedness = active.handedness || appState.latestHandedness;
     } else {
         appState.latestLandmarks = null;
         appState.latestBounds = null;
@@ -1410,7 +1543,15 @@ function onHandResults(results) {
         updateTraining(now);
     }
 
+    if (appState.screen === 'instructions' && isPinchDefenseExercise()) {
+        updatePinchDefenseInstructionUI();
+    }
+
     drawOverlay();
+}
+
+function updatePinchDefenseInstructionUI() {
+    window.PinchDefenseHost.updateInstructionUI(dom.screenRoot, appState.latestHandedness);
 }
 
 function resetZoneState() {
@@ -1813,9 +1954,62 @@ function isHandWithdrawn(bounds) {
     return bounds.minX < 0.02 || bounds.maxX > 0.98 || bounds.minY < 0.02 || bounds.maxY > 0.98;
 }
 
+function updatePinchDefenseTraining(now) {
+    const training = appState.training;
+    if (!training) return;
+
+    const deltaSeconds = Math.max(0, (now - (training.lastFrameAt || now)) / 1000);
+    training.lastFrameAt = now;
+
+    const handPresent = Boolean(appState.latestLandmarks);
+    const trackingOk = handPresent && !isHandWithdrawn(appState.latestBounds);
+
+    if (!trackingOk) {
+        if (!training.handLossStartedAt) {
+            training.handLossStartedAt = now;
+        }
+    } else {
+        training.handLossStartedAt = 0;
+    }
+
+    if (training.gameRuntime && typeof training.gameRuntime.notifyFrame === 'function') {
+        training.gameRuntime.notifyFrame({
+            now,
+            deltaSeconds,
+            landmarks: appState.latestLandmarks,
+            bounds: appState.latestBounds,
+            handedness: appState.latestHandedness,
+            handPresent,
+            trackingOk,
+        });
+        syncTrainingGameSnapshot(training);
+    }
+
+    const viewState = training.gameViewState || {};
+    training.cueText = viewState.cueTitle || 'Defend the lane with clean pinches.';
+    training.cueDetail = viewState.cueText || 'Match the enemy symbol, then release before the next pinch.';
+    training.calibrationText = viewState.trackingText || (trackingOk ? 'Hand tracking stable' : 'Tracking lost');
+
+    if (!trackingOk && training.handLossStartedAt && now - training.handLossStartedAt >= PINCH_DEFENSE_PAUSE_MS) {
+        pauseTraining();
+        return;
+    }
+
+    if (viewState.finishRequested) {
+        finishTraining(Boolean(viewState.completed));
+        return;
+    }
+
+    updateTrainingUI();
+}
+
 function updateTraining(now) {
     const training = appState.training;
     if (!training) return;
+    if (training.interactionMode === 'pinch_defense') {
+        updatePinchDefenseTraining(now);
+        return;
+    }
     const deltaSeconds = Math.max(0, (now - (training.lastFrameAt || now)) / 1000);
     training.lastFrameAt = now;
 
@@ -1963,8 +2157,7 @@ function updateTrainingUI() {
     const training = appState.training;
     if (!training) return;
 
-    const completed = training.guideIndex;
-    const progressPercent = getCompletionPercent(completed);
+    const progressPercent = getTrainingProgressPercent(training);
 
     const progressFill = dom.screenRoot.querySelector('#trainingProgressFill');
     const progressPop = dom.screenRoot.querySelector('#trainingProgressPop');
@@ -1983,7 +2176,7 @@ function updateTrainingUI() {
     if (progressFill) progressFill.style.height = `${progressPercent}%`;
     if (progressPop) progressPop.textContent = `${progressPercent}%`;
     if (progressMeta) progressMeta.textContent = `${progressPercent}% complete`;
-    if (calibration) calibration.textContent = training.calibrationText;
+    if (calibration) calibration.textContent = training.calibrationText || 'Scanning live hand';
     if (cueTitle) cueTitle.textContent = training.cueText;
     if (cueText) cueText.textContent = training.cueDetail;
     if (gameModeTitle) gameModeTitle.textContent = training.gameModeTitle || 'Game Mode';

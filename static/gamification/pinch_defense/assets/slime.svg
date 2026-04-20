@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+  <defs>
+    <linearGradient id="goo" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#6ee7b7"/>
+      <stop offset="1" stop-color="#0f766e"/>
+    </linearGradient>
+  </defs>
+  <rect width="160" height="160" fill="none"/>
+  <path d="M30 118C30 66 51 34 80 34C109 34 130 66 130 118C121 106 110 106 99 118C92 106 84 105 80 118C74 105 65 106 58 118C50 106 40 106 30 118Z" fill="url(#goo)"/>
+  <circle cx="62" cy="82" r="7" fill="#083344"/>
+  <circle cx="98" cy="82" r="7" fill="#083344"/>
+  <path d="M58 102C66 108 94 108 102 102" fill="none" stroke="#083344" stroke-width="6" stroke-linecap="round"/>
+</svg>
