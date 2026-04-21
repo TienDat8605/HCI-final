@@ -52,8 +52,8 @@
     const WAVES = [
         {
             label: 'Wave 1',
-            travelTimeMs: 5500,
-            spawnIntervalMs: 1250,
+            travelTimeMs: 7500,
+            spawnIntervalMs: 1500,
             enemies: [
                 { type: 'ghost', sequence: ['index'] },
                 { type: 'ghost', sequence: ['middle'] },
@@ -65,8 +65,8 @@
         },
         {
             label: 'Wave 2',
-            travelTimeMs: 4700,
-            spawnIntervalMs: 1180,
+            travelTimeMs: 6700,
+            spawnIntervalMs: 1380,
             enemies: [
                 { type: 'ghost', sequence: ['ring'] },
                 { type: 'ghost', sequence: ['middle'] },
@@ -80,8 +80,8 @@
         },
         {
             label: 'Wave 3',
-            travelTimeMs: 4000,
-            spawnIntervalMs: 1020,
+            travelTimeMs: 5600,
+            spawnIntervalMs: 1260,
             enemies: [
                 { type: 'slime', sequence: ['index', 'ring'] },
                 { type: 'ghost', sequence: ['middle'] },
