@@ -188,6 +188,8 @@
 
     function renderTrainingScreen({ exercise, training, progressPercent, currentCue, gameModeTitle, gameHud }) {
         const viewState = training && training.gameViewState ? training.gameViewState : {};
+        const trackingLost = Boolean(viewState.trackingWarning);
+        const trackingStatusText = viewState.trackingText || 'Scanning live hand';
 
         return `
             <section class="screen training-screen pinch-training-screen">
@@ -228,15 +230,12 @@
                             <small id="trainingGameStatusText">${gameHud.statusText}</small>
                         </div>
 
-                        <div class="pinch-side-card">
-                            <span class="pinch-side-label">Front Enemy</span>
-                            <strong>${viewState.frontEnemyLabel || 'No target'}</strong>
-                            ${renderSequence(viewState.frontEnemySequence)}
-                        </div>
-
-                        <div class="pinch-side-card">
+                        <div class="pinch-side-card pinch-tracking-card ${trackingLost ? 'is-warning' : 'is-stable'}">
                             <span class="pinch-side-label">Tracking</span>
-                            <strong id="trainingCalibrationText">${viewState.trackingText || 'Scanning live hand'}</strong>
+                            <strong id="trainingCalibrationText" class="pinch-tracking-state">${trackingStatusText}</strong>
+                            <div class="pinch-tracking-instruction">
+                                Put your hand in front of the camera and keep it a bit far from the lens, not too close.
+                            </div>
                             <small>${currentCue}</small>
                         </div>
                     </aside>

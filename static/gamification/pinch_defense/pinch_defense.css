@@ -165,20 +165,41 @@
 }
 
 .pinch-defense-finger {
+    position: relative;
+    overflow: hidden;
+    display: grid;
+    justify-items: center;
+    align-content: start;
+    gap: 4px;
     padding: 12px;
     background: rgba(255, 255, 255, 0.92);
-    border-top: 4px solid var(--finger-color);
     box-shadow: var(--shadow);
     transition: transform var(--transition), box-shadow var(--transition), background var(--transition);
     text-align: center;
 }
 
+.pinch-defense-finger::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 66% 0;
+    background: var(--finger-color);
+    opacity: 0.24;
+}
+
+.pinch-defense-finger > * {
+    position: relative;
+    z-index: 1;
+}
+
 .pinch-defense-finger-symbol {
     display: block;
-    font-size: 1.4rem;
+    font-size: 2.5rem;
+    font-weight: 700;
     line-height: 1;
     color: var(--finger-color);
-    margin-bottom: 8px;
+    margin-bottom: 10px;
+    margin-top: 4px;
+    text-shadow: 0 2px 10px rgba(15, 23, 42, 0.18);
 }
 
 .pinch-defense-finger.is-confirmed {
@@ -272,6 +293,49 @@
 
 .pinch-side-card strong {
     font-size: 1.02rem;
+}
+
+.pinch-tracking-card {
+    gap: 12px;
+}
+
+.pinch-tracking-card.is-warning {
+    background: rgba(254, 202, 202, 0.98);
+    box-shadow: 0 18px 40px rgba(127, 29, 29, 0.14);
+}
+
+.pinch-tracking-card.is-stable {
+    background: rgba(240, 253, 250, 0.96);
+}
+
+.pinch-tracking-state {
+    margin-top: 10px;
+    font-size: 1.55rem;
+    line-height: 1.1;
+}
+
+.pinch-tracking-card.is-warning .pinch-tracking-state {
+    color: #1f2937;
+    font-size: 1.9rem;
+}
+
+.pinch-tracking-card.is-stable .pinch-tracking-state {
+    color: #065f46;
+}
+
+.pinch-tracking-instruction {
+    margin-top: 12px;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.78);
+    border-left: 4px solid currentColor;
+    font-size: 0.92rem;
+    line-height: 1.45;
+    color: #334155;
+}
+
+.pinch-tracking-card.is-warning .pinch-tracking-instruction {
+    color: #1f2937;
+    background: rgba(255, 255, 255, 0.72);
 }
 
 .pinch-side-metric {

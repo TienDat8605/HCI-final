@@ -5,6 +5,20 @@
         'https://cdn.jsdelivr.net/npm/pixi.js@7.4.2/dist/pixi.min.js',
         'https://unpkg.com/pixi.js@7.4.2/dist/pixi.min.js',
     ];
+    const PLAYER_WIDTH_RATIO = 0.16;
+    const PLAYER_HEIGHT_RATIO = 0.28;
+    const ENEMY_SIZE_RATIO = 0.08;
+    const SEQUENCE_FONT_RATIO = 0.048;
+    const SEQUENCE_Y_OFFSET_RATIO = 0.13;
+    const SEQUENCE_SPACING_RATIO = 0.04;
+    const HAND_CONNECTIONS = [
+        [0, 1], [1, 2], [2, 3], [3, 4],
+        [0, 5], [5, 6], [6, 7], [7, 8],
+        [0, 9], [9, 10], [10, 11], [11, 12],
+        [0, 13], [13, 14], [14, 15], [15, 16],
+        [0, 17], [17, 18], [18, 19], [19, 20],
+        [5, 9], [9, 13], [13, 17],
+    ];
 
     function getShapeEntity(shape) {
         if (shape === 'triangle') return '\u25B2';
@@ -81,6 +95,7 @@
             playerDisplay: null,
             enemyDisplays: {},
             transientText: null,
+            handOverlay: null,
             resizeObserver: null,
             pixiReadyPromise: null,
         };
@@ -211,11 +226,11 @@
         function createSequenceText(symbol, color) {
             return new runtime.pixi.Text(symbol, {
                 fontFamily: '"Space Grotesk", sans-serif',
-                fontSize: 20,
+                fontSize: 24,
                 fontWeight: '700',
                 fill: color,
                 stroke: '#ffffff',
-                strokeThickness: 1,
+                strokeThickness: 2,
             });
         }
 
@@ -254,7 +269,7 @@
             container.addChild(flash);
 
             const sequence = new runtime.pixi.Container();
-            sequence.y = -64;
+            sequence.y = -82;
             sequence.zIndex = 3;
             container.addChild(sequence);
 
@@ -278,11 +293,15 @@
         function syncEnemySequence(display, enemy) {
             display.sequence.removeChildren().forEach((child) => child.destroy());
             const pendingSequence = enemy.sequence.slice(enemy.currentStep);
+            const stageWidth = runtime.app ? runtime.app.renderer.width : 1280;
+            const symbolSpacing = Math.max(24, stageWidth * SEQUENCE_SPACING_RATIO);
+            const symbolFontSize = Math.max(24, Math.round(stageWidth * SEQUENCE_FONT_RATIO));
             pendingSequence.forEach((fingerId, index) => {
                 const fingerConfig = config.fingers[fingerId];
                 const symbol = createSequenceText(getShapeEntity(fingerConfig.shape), fingerConfig.color);
+                symbol.style.fontSize = symbolFontSize;
                 symbol.anchor.set(0.5, 0.5);
-                symbol.x = (index * 28) - ((pendingSequence.length - 1) * 14);
+                symbol.x = (index * symbolSpacing) - ((pendingSequence.length - 1) * symbolSpacing * 0.5);
                 display.sequence.addChild(symbol);
             });
         }
@@ -290,8 +309,8 @@
         function syncPlayer(width, height) {
             const player = runtime.playerDisplay || createPlayerDisplay();
             const elapsedSeconds = runtime.app.ticker.lastTime / 1000;
-            const drawWidth = width * 0.16;
-            const drawHeight = height * 0.28;
+            const drawWidth = width * PLAYER_WIDTH_RATIO;
+            const drawHeight = height * PLAYER_HEIGHT_RATIO;
             player.position.set(width * 0.18, height * 0.54 + (Math.sin(elapsedSeconds * 2.4) * 4));
             player.sprite.width = drawWidth;
             player.sprite.height = drawHeight;
@@ -310,13 +329,20 @@
                 const x = laneStart + enemy.x * laneWidth;
                 const bob = Math.sin((elapsedSeconds * 3.6) + index) * 6;
                 const knockback = enemy.knockbackMs > 0 ? 10 * Math.min(1, enemy.knockbackMs / 180) : 0;
+                const enemySize = Math.max(56, width * ENEMY_SIZE_RATIO);
+                const sequenceYOffset = Math.max(68, height * SEQUENCE_Y_OFFSET_RATIO);
 
                 display.container.position.set(x + knockback, baseY + bob);
                 display.container.scale.set(enemy.hitFlashMs > 0 ? 1.08 : 1);
                 display.body.rotation = Math.sin((elapsedSeconds * 2.1) + index) * 0.05;
+                display.body.width = enemySize;
+                display.body.height = enemySize;
                 display.flash.visible = enemy.hitFlashMs > 0;
+                display.flash.scale.set(enemySize / 88);
                 display.shadow.scale.x = 1 + (Math.sin((elapsedSeconds * 2.4) + index) * 0.08);
+                display.shadow.scale.y = enemySize / 88;
                 display.shadow.alpha = 0.28 + (Math.sin((elapsedSeconds * 2.4) + index) * 0.04);
+                display.sequence.y = -sequenceYOffset;
                 syncEnemySequence(display, enemy);
             });
 
@@ -342,6 +368,36 @@
             runtime.transientText.position.set(width * 0.44, height * 0.2);
         }
 
+        function syncHandOverlay(viewState, width, height) {
+            if (!runtime.handOverlay) {
+                runtime.handOverlay = new runtime.pixi.Graphics();
+                runtime.overlayLayer.addChild(runtime.handOverlay);
+            }
+
+            const graphics = runtime.handOverlay;
+            graphics.clear();
+
+            if (!Array.isArray(viewState.handLandmarks) || viewState.handLandmarks.length !== 21) {
+                return;
+            }
+
+            const strokeColor = viewState.trackingWarning ? 0xff6b6b : 0x7dd3fc;
+            const pointColor = viewState.trackingWarning ? 0xff8a8a : 0xdffcff;
+            graphics.lineStyle(4, strokeColor, 0.95);
+            HAND_CONNECTIONS.forEach(([startIndex, endIndex]) => {
+                const start = viewState.handLandmarks[startIndex];
+                const end = viewState.handLandmarks[endIndex];
+                graphics.moveTo(start.x * width, start.y * height);
+                graphics.lineTo(end.x * width, end.y * height);
+            });
+
+            viewState.handLandmarks.forEach((landmark) => {
+                graphics.beginFill(pointColor, 0.92);
+                graphics.drawCircle(landmark.x * width, landmark.y * height, 6);
+                graphics.endFill();
+            });
+        }
+
         function drawStage(viewState) {
             if (!runtime.app) {
                 return;
@@ -352,6 +408,7 @@
             syncPlayer(width, height);
             syncEnemies(viewState, width, height);
             syncTransient(viewState, width, height);
+            syncHandOverlay(viewState, width, height);
         }
 
         function updateGuide(viewState) {

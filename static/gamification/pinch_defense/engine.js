@@ -106,6 +106,7 @@
             transientUntilMs: 0,
             pendingRelease: false,
             detectorStates: {},
+            handLandmarks: null,
             handedness: 'Right',
             lastDefeatAt: 0,
             lastTrackingOk: true,
@@ -371,6 +372,7 @@
             state.detectorStates = detectorOutput.states;
             state.lastTrackingOk = detectorOutput.trackingOk;
             state.activeFinger = detectorOutput.activeFinger;
+            state.handLandmarks = detectorOutput.landmarks || null;
 
             detectorOutput.events.forEach((event) => {
                 if (event.type === 'pinch_confirmed') {
@@ -499,6 +501,7 @@
                     knockbackMs: enemy.knockbackMs,
                 })),
                 detectorStates: state.detectorStates,
+                handLandmarks: state.handLandmarks,
                 trackingWarning: !state.lastTrackingOk,
                 pendingRelease: state.pendingRelease,
                 frontEnemyLabel: frontEnemy ? frontEnemy.label : '',

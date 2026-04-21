@@ -103,6 +103,7 @@
                     trackingOk: false,
                     activeFinger: null,
                     states: perFinger,
+                    landmarks: null,
                     events,
                 };
             }
@@ -114,6 +115,7 @@
                     trackingOk: false,
                     activeFinger: null,
                     states: perFinger,
+                    landmarks: null,
                     events,
                 };
             }
@@ -190,6 +192,7 @@
                     trackingOk: true,
                     activeFinger: null,
                     states: perFinger,
+                    landmarks: frame.landmarks,
                     events,
                 };
             }
@@ -212,6 +215,7 @@
                     trackingOk: true,
                     activeFinger: isAmbiguous ? null : null,
                     states: perFinger,
+                    landmarks: frame.landmarks,
                     events,
                 };
             }
@@ -257,6 +261,7 @@
                 trackingOk: true,
                 activeFinger: bestCandidate.fingerId,
                 states: perFinger,
+                landmarks: frame.landmarks,
                 events,
             };
         }
