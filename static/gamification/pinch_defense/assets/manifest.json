@@ -1,8 +1,13 @@
 {
   "assets": {
-    "wizard": "wizard.svg",
-    "ghost": "ghost.svg",
-    "slime": "slime.svg",
-    "skull": "skull.svg"
+    "wizard": "witch_normal.png",
+    "witch_normal": "witch_normal.png",
+    "witch_raise": "witch_raise.png",
+    "ghost": "ghost.png",
+    "slime": "ghost.png",
+    "skull": "skull.png",
+    "heart_full": "heart_full.png",
+    "heart_empty": "heart_empty.png",
+    "hand_full_guide": "hand_full_guide.jpg"
   }
 }

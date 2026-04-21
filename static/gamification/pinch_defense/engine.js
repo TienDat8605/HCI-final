@@ -104,6 +104,7 @@
             cueText: 'Match the front enemy symbol with the correct finger pinch.',
             transientText: '',
             transientUntilMs: 0,
+            playerHitFlashMs: 0,
             pendingRelease: false,
             detectorStates: {},
             handLandmarks: null,
@@ -277,6 +278,7 @@
 
         function updateEnemyPositions(deltaSeconds) {
             const remainingEnemies = [];
+            state.playerHitFlashMs = Math.max(0, state.playerHitFlashMs - deltaSeconds * 1000);
             state.activeEnemies.forEach((enemy) => {
                 const travelRange = config.enemyStartX - config.playerX;
                 const speed = travelRange / (enemy.travelTimeMs / 1000);
@@ -286,6 +288,7 @@
 
                 if (enemy.x <= config.playerX) {
                     state.hp = Math.max(0, state.hp - 1);
+                    state.playerHitFlashMs = 320;
                     state.statusText = `${enemy.label} reached the wizard. Recenter and continue.`;
                     state.praiseText = 'BLOCKED';
                     breakCombo();
@@ -477,6 +480,7 @@
                 highestCombo: state.highestCombo,
                 hp: state.hp,
                 hearts,
+                playerHitFlashMs: state.playerHitFlashMs,
                 waveLabel: state.currentWaveLabel,
                 currentWave: Math.min(state.currentWaveIndex + 1, config.waves.length),
                 totalWaves: config.waves.length,

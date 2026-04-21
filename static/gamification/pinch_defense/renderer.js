@@ -5,26 +5,33 @@
         'https://cdn.jsdelivr.net/npm/pixi.js@7.4.2/dist/pixi.min.js',
         'https://unpkg.com/pixi.js@7.4.2/dist/pixi.min.js',
     ];
-    const PLAYER_WIDTH_RATIO = 0.16;
-    const PLAYER_HEIGHT_RATIO = 0.28;
-    const ENEMY_SIZE_RATIO = 0.08;
+    const PLAYER_WIDTH_RATIO = 0.17;
+    const PLAYER_HEIGHT_RATIO = 0.31;
+    const ENEMY_SIZE_RATIO = 0.085;
     const SEQUENCE_FONT_RATIO = 0.048;
-    const SEQUENCE_Y_OFFSET_RATIO = 0.13;
+    const SEQUENCE_Y_OFFSET_RATIO = 0.14;
     const SEQUENCE_SPACING_RATIO = 0.04;
-    const HAND_CONNECTIONS = [
-        [0, 1], [1, 2], [2, 3], [3, 4],
-        [0, 5], [5, 6], [6, 7], [7, 8],
-        [0, 9], [9, 10], [10, 11], [11, 12],
-        [0, 13], [13, 14], [14, 15], [15, 16],
-        [0, 17], [17, 18], [18, 19], [19, 20],
-        [5, 9], [9, 13], [13, 17],
-    ];
+    const PLAYER_HIT_FLASH_MS = 320;
+    const ENEMY_HIT_FLASH_MS = 220;
+    const ENEMY_FADE_MS = 520;
+    const HEART_SIZE = 30;
 
     function getShapeEntity(shape) {
         if (shape === 'triangle') return '\u25B2';
         if (shape === 'square') return '\u25A0';
         if (shape === 'diamond') return '\u25C6';
         return '\u25CF';
+    }
+
+    function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    function colorToNumber(color) {
+        if (!color || color[0] !== '#') {
+            return 0xffffff;
+        }
+        return Number.parseInt(color.slice(1), 16);
     }
 
     function loadPixi() {
@@ -93,9 +100,10 @@
             enemyLayer: null,
             overlayLayer: null,
             playerDisplay: null,
-            enemyDisplays: {},
+            heartDisplay: null,
             transientText: null,
-            handOverlay: null,
+            hitOverlay: null,
+            enemyDisplays: {},
             resizeObserver: null,
             pixiReadyPromise: null,
         };
@@ -166,6 +174,18 @@
             return fallbackFactory();
         }
 
+        function getHeartTexture(isFull) {
+            return getTexture(isFull ? 'heart_full' : 'heart_empty', () => createVectorTexture(64, 58, (graphics) => {
+                graphics.beginFill(isFull ? 0xef4444 : 0x94a3b8, isFull ? 1 : 0.38);
+                graphics.moveTo(32, 54);
+                graphics.bezierCurveTo(10, 38, 4, 18, 18, 8);
+                graphics.bezierCurveTo(28, 2, 36, 12, 32, 18);
+                graphics.bezierCurveTo(28, 12, 36, 2, 46, 8);
+                graphics.bezierCurveTo(60, 18, 54, 38, 32, 54);
+                graphics.endFill();
+            }));
+        }
+
         function drawBackground(width, height) {
             if (!runtime.backgroundLayer) {
                 return;
@@ -202,24 +222,53 @@
 
         function createPlayerDisplay() {
             const container = new runtime.pixi.Container();
-            const texture = getTexture('wizard', () => createVectorTexture(84, 120, (graphics) => {
-                graphics.beginFill(0xf8fafc);
-                graphics.drawCircle(42, 28, 14);
+
+            const glow = new runtime.pixi.Graphics();
+            glow.visible = false;
+            container.addChild(glow);
+
+            const normalTexture = getTexture('witch_normal', () => createVectorTexture(120, 150, (graphics) => {
+                graphics.beginFill(0xe2e8f0);
+                graphics.drawCircle(60, 36, 18);
                 graphics.endFill();
                 graphics.beginFill(0x2563eb);
-                graphics.moveTo(18, 116);
-                graphics.lineTo(42, 22);
-                graphics.lineTo(68, 116);
+                graphics.moveTo(26, 144);
+                graphics.lineTo(60, 28);
+                graphics.lineTo(96, 144);
                 graphics.closePath();
                 graphics.endFill();
             }));
+            const raiseTexture = getTexture('witch_raise', () => normalTexture);
 
-            const sprite = new runtime.pixi.Sprite(texture);
-            sprite.anchor.set(0.5, 0.5);
-            container.addChild(sprite);
-            container.sprite = sprite;
+            const body = new runtime.pixi.Sprite(normalTexture);
+            body.anchor.set(0.5, 0.58);
+            container.addChild(body);
+
+            const damageOverlay = new runtime.pixi.Sprite(normalTexture);
+            damageOverlay.anchor.set(0.5, 0.58);
+            damageOverlay.tint = 0xff5c5c;
+            damageOverlay.alpha = 0;
+            container.addChild(damageOverlay);
+
+            container.body = body;
+            container.damageOverlay = damageOverlay;
+            container.glow = glow;
+            container.normalTexture = normalTexture;
+            container.raiseTexture = raiseTexture;
             runtime.actorLayer.addChild(container);
             runtime.playerDisplay = container;
+            return container;
+        }
+
+        function ensureHeartDisplay() {
+            if (runtime.heartDisplay) {
+                return runtime.heartDisplay;
+            }
+
+            const container = new runtime.pixi.Container();
+            container.sprites = [];
+            runtime.overlayLayer.addChild(container);
+            runtime.heartDisplay = container;
             return container;
         }
 
@@ -242,7 +291,7 @@
             shadow.beginFill(0x07101f, 0.32);
             shadow.drawEllipse(0, 0, 26, 10);
             shadow.endFill();
-            shadow.y = 50;
+            shadow.y = 48;
             shadow.zIndex = 0;
             container.addChild(shadow);
 
@@ -254,28 +303,38 @@
                 graphics.drawCircle(44, 44, 30);
                 graphics.endFill();
             }));
+
             const body = new runtime.pixi.Sprite(texture);
-            body.anchor.set(0.5, 0.5);
-            body.y = -8;
+            body.anchor.set(0.5, 0.58);
             body.zIndex = 1;
             container.addChild(body);
 
-            const flash = new runtime.pixi.Graphics();
-            flash.beginFill(0xf8fafc, 0.16);
-            flash.drawCircle(0, -8, 42);
-            flash.endFill();
-            flash.visible = false;
-            flash.zIndex = 2;
-            container.addChild(flash);
+            const damageOverlay = new runtime.pixi.Sprite(texture);
+            damageOverlay.anchor.set(0.5, 0.58);
+            damageOverlay.tint = 0xff5c5c;
+            damageOverlay.alpha = 0;
+            damageOverlay.zIndex = 2;
+            container.addChild(damageOverlay);
 
             const sequence = new runtime.pixi.Container();
-            sequence.y = -82;
             sequence.zIndex = 3;
             container.addChild(sequence);
 
+            const display = {
+                container,
+                shadow,
+                body,
+                damageOverlay,
+                sequence,
+                isDying: false,
+                dyingMs: ENEMY_FADE_MS,
+                maxDyingMs: ENEMY_FADE_MS,
+                seen: false,
+            };
+
             runtime.enemyLayer.addChild(container);
-            runtime.enemyDisplays[enemy.id] = { container, shadow, body, flash, sequence };
-            return runtime.enemyDisplays[enemy.id];
+            runtime.enemyDisplays[enemy.id] = display;
+            return display;
         }
 
         function destroyEnemyDisplay(enemyId) {
@@ -290,10 +349,9 @@
             delete runtime.enemyDisplays[enemyId];
         }
 
-        function syncEnemySequence(display, enemy) {
+        function syncEnemySequence(display, enemy, stageWidth) {
             display.sequence.removeChildren().forEach((child) => child.destroy());
             const pendingSequence = enemy.sequence.slice(enemy.currentStep);
-            const stageWidth = runtime.app ? runtime.app.renderer.width : 1280;
             const symbolSpacing = Math.max(24, stageWidth * SEQUENCE_SPACING_RATIO);
             const symbolFontSize = Math.max(24, Math.round(stageWidth * SEQUENCE_FONT_RATIO));
             pendingSequence.forEach((fingerId, index) => {
@@ -306,14 +364,81 @@
             });
         }
 
-        function syncPlayer(width, height) {
+        function syncPlayer(viewState, width, height) {
             const player = runtime.playerDisplay || createPlayerDisplay();
             const elapsedSeconds = runtime.app.ticker.lastTime / 1000;
             const drawWidth = width * PLAYER_WIDTH_RATIO;
             const drawHeight = height * PLAYER_HEIGHT_RATIO;
-            player.position.set(width * 0.18, height * 0.54 + (Math.sin(elapsedSeconds * 2.4) * 4));
-            player.sprite.width = drawWidth;
-            player.sprite.height = drawHeight;
+            const raiseFingerId = viewState.confirmedFinger || viewState.activeFinger || null;
+            const glowColor = raiseFingerId && config.fingers[raiseFingerId]
+                ? colorToNumber(config.fingers[raiseFingerId].color)
+                : 0x60a5fa;
+            const playerHitAlpha = clamp((viewState.playerHitFlashMs || 0) / PLAYER_HIT_FLASH_MS, 0, 1);
+
+            player.position.set(width * 0.18, height * 0.58 + (Math.sin(elapsedSeconds * 2.4) * 4));
+            player.body.texture = raiseFingerId ? player.raiseTexture : player.normalTexture;
+            player.body.width = drawWidth;
+            player.body.height = drawHeight;
+
+            player.damageOverlay.texture = player.body.texture;
+            player.damageOverlay.width = drawWidth;
+            player.damageOverlay.height = drawHeight;
+            player.damageOverlay.alpha = playerHitAlpha * 0.32;
+
+            player.glow.clear();
+            if (raiseFingerId) {
+                const pulse = 0.18 + (Math.sin(elapsedSeconds * 6) * 0.05);
+                player.glow.beginFill(glowColor, pulse);
+                player.glow.drawEllipse(0, 8, drawWidth * 0.42, drawHeight * 0.36);
+                player.glow.endFill();
+                player.glow.visible = true;
+            } else {
+                player.glow.visible = false;
+            }
+        }
+
+        function syncHearts(viewState) {
+            const heartDisplay = ensureHeartDisplay();
+            const totalHearts = Array.isArray(viewState.hearts) ? viewState.hearts.length : 0;
+            while (heartDisplay.sprites.length < totalHearts) {
+                const sprite = new runtime.pixi.Sprite(getHeartTexture(true));
+                sprite.anchor.set(0, 0);
+                heartDisplay.addChild(sprite);
+                heartDisplay.sprites.push(sprite);
+            }
+            while (heartDisplay.sprites.length > totalHearts) {
+                const sprite = heartDisplay.sprites.pop();
+                heartDisplay.removeChild(sprite);
+                sprite.destroy();
+            }
+
+            heartDisplay.position.set(24, 20);
+            heartDisplay.sprites.forEach((sprite, index) => {
+                const isFull = Boolean(viewState.hearts[index]);
+                sprite.texture = getHeartTexture(isFull);
+                sprite.width = HEART_SIZE;
+                sprite.height = Math.round(HEART_SIZE * 0.91);
+                sprite.x = index * (HEART_SIZE + 8);
+                sprite.y = 0;
+                sprite.alpha = isFull ? 1 : 0.72;
+            });
+        }
+
+        function syncHitOverlay(viewState, width, height) {
+            if (!runtime.hitOverlay) {
+                runtime.hitOverlay = new runtime.pixi.Graphics();
+                runtime.overlayLayer.addChild(runtime.hitOverlay);
+            }
+
+            const alpha = clamp((viewState.playerHitFlashMs || 0) / PLAYER_HIT_FLASH_MS, 0, 1) * 0.18;
+            runtime.hitOverlay.clear();
+            if (alpha <= 0.001) {
+                return;
+            }
+
+            runtime.hitOverlay.beginFill(0xff3b3b, alpha);
+            runtime.hitOverlay.drawRect(0, 0, width, height);
+            runtime.hitOverlay.endFill();
         }
 
         function syncEnemies(viewState, width, height) {
@@ -321,33 +446,64 @@
             const laneWidth = width * 0.68;
             const baseY = height * 0.55;
             const elapsedSeconds = runtime.app.ticker.lastTime / 1000;
-            const activeIds = new Set();
+            const deltaMs = runtime.app.ticker.deltaMS || 16.67;
+            const enemySize = Math.max(56, width * ENEMY_SIZE_RATIO);
+            const sequenceYOffset = Math.max(72, height * SEQUENCE_Y_OFFSET_RATIO);
+
+            Object.values(runtime.enemyDisplays).forEach((display) => {
+                display.seen = false;
+            });
 
             viewState.enemies.forEach((enemy, index) => {
-                activeIds.add(enemy.id);
                 const display = runtime.enemyDisplays[enemy.id] || createEnemyDisplay(enemy);
                 const x = laneStart + enemy.x * laneWidth;
                 const bob = Math.sin((elapsedSeconds * 3.6) + index) * 6;
                 const knockback = enemy.knockbackMs > 0 ? 10 * Math.min(1, enemy.knockbackMs / 180) : 0;
-                const enemySize = Math.max(56, width * ENEMY_SIZE_RATIO);
-                const sequenceYOffset = Math.max(68, height * SEQUENCE_Y_OFFSET_RATIO);
+                const hitAlpha = clamp((enemy.hitFlashMs || 0) / ENEMY_HIT_FLASH_MS, 0, 1);
 
+                display.seen = true;
+                display.isDying = false;
+                display.dyingMs = display.maxDyingMs;
+                display.container.alpha = 1;
                 display.container.position.set(x + knockback, baseY + bob);
-                display.container.scale.set(enemy.hitFlashMs > 0 ? 1.08 : 1);
-                display.body.rotation = Math.sin((elapsedSeconds * 2.1) + index) * 0.05;
+                display.container.scale.set(enemy.hitFlashMs > 0 ? 1.05 : 1);
+
+                display.body.texture = getTexture(enemy.assetId, () => display.body.texture);
                 display.body.width = enemySize;
                 display.body.height = enemySize;
-                display.flash.visible = enemy.hitFlashMs > 0;
-                display.flash.scale.set(enemySize / 88);
-                display.shadow.scale.x = 1 + (Math.sin((elapsedSeconds * 2.4) + index) * 0.08);
+                display.body.rotation = Math.sin((elapsedSeconds * 2.1) + index) * 0.05;
+
+                display.damageOverlay.texture = display.body.texture;
+                display.damageOverlay.width = enemySize;
+                display.damageOverlay.height = enemySize;
+                display.damageOverlay.alpha = hitAlpha * 0.28;
+
+                display.shadow.scale.x = (enemySize / 88) * (1 + (Math.sin((elapsedSeconds * 2.4) + index) * 0.08));
                 display.shadow.scale.y = enemySize / 88;
                 display.shadow.alpha = 0.28 + (Math.sin((elapsedSeconds * 2.4) + index) * 0.04);
                 display.sequence.y = -sequenceYOffset;
-                syncEnemySequence(display, enemy);
+                syncEnemySequence(display, enemy, width);
             });
 
-            Object.keys(runtime.enemyDisplays).forEach((enemyId) => {
-                if (!activeIds.has(enemyId)) {
+            Object.entries(runtime.enemyDisplays).forEach(([enemyId, display]) => {
+                if (display.seen) {
+                    return;
+                }
+
+                if (!display.isDying) {
+                    display.isDying = true;
+                    display.dyingMs = display.maxDyingMs;
+                    display.body.rotation = 0;
+                    display.damageOverlay.alpha = 0;
+                }
+
+                display.dyingMs -= deltaMs;
+                display.container.alpha = clamp(display.dyingMs / display.maxDyingMs, 0, 1);
+                display.container.scale.set(0.96 + (display.container.alpha * 0.04));
+                display.sequence.alpha = display.container.alpha;
+                display.shadow.alpha = display.container.alpha * 0.24;
+
+                if (display.dyingMs <= 0) {
                     destroyEnemyDisplay(enemyId);
                 }
             });
@@ -368,47 +524,19 @@
             runtime.transientText.position.set(width * 0.44, height * 0.2);
         }
 
-        function syncHandOverlay(viewState, width, height) {
-            if (!runtime.handOverlay) {
-                runtime.handOverlay = new runtime.pixi.Graphics();
-                runtime.overlayLayer.addChild(runtime.handOverlay);
-            }
-
-            const graphics = runtime.handOverlay;
-            graphics.clear();
-
-            if (!Array.isArray(viewState.handLandmarks) || viewState.handLandmarks.length !== 21) {
-                return;
-            }
-
-            const strokeColor = viewState.trackingWarning ? 0xff6b6b : 0x7dd3fc;
-            const pointColor = viewState.trackingWarning ? 0xff8a8a : 0xdffcff;
-            graphics.lineStyle(4, strokeColor, 0.95);
-            HAND_CONNECTIONS.forEach(([startIndex, endIndex]) => {
-                const start = viewState.handLandmarks[startIndex];
-                const end = viewState.handLandmarks[endIndex];
-                graphics.moveTo(start.x * width, start.y * height);
-                graphics.lineTo(end.x * width, end.y * height);
-            });
-
-            viewState.handLandmarks.forEach((landmark) => {
-                graphics.beginFill(pointColor, 0.92);
-                graphics.drawCircle(landmark.x * width, landmark.y * height, 6);
-                graphics.endFill();
-            });
-        }
-
         function drawStage(viewState) {
             if (!runtime.app) {
                 return;
             }
+
             resolveStageSize();
             const width = runtime.app.renderer.width;
             const height = runtime.app.renderer.height;
-            syncPlayer(width, height);
+            syncPlayer(viewState, width, height);
             syncEnemies(viewState, width, height);
+            syncHearts(viewState);
             syncTransient(viewState, width, height);
-            syncHandOverlay(viewState, width, height);
+            syncHitOverlay(viewState, width, height);
         }
 
         function updateGuide(viewState) {
@@ -553,7 +681,9 @@
             Object.keys(runtime.enemyDisplays).forEach(destroyEnemyDisplay);
             runtime.enemyDisplays = {};
             runtime.playerDisplay = null;
+            runtime.heartDisplay = null;
             runtime.transientText = null;
+            runtime.hitOverlay = null;
             runtime.stage = null;
             runtime.backgroundLayer = null;
             runtime.actorLayer = null;

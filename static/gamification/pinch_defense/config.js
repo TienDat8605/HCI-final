@@ -102,7 +102,7 @@
         sessionDurationMs: 180000,
         pauseThresholdMs: 800,
         comboWindowMs: 3000,
-        playerMaxHp: 100,
+        playerMaxHp: 5,
         enemyStartX: 1.02,
         playerX: 0.18,
         maxActiveEnemies: MAX_ACTIVE_ENEMIES,

@@ -57,6 +57,7 @@
 
     function renderInstructionScreen({ exercise, copy, zoneConfig, handedness, zoneMarkup }) {
         const durationMinutes = exercise ? Math.max(1, Math.round(getDurationSeconds(exercise) / 60)) : '--';
+        const guideAssetPath = '/static/gamification/pinch_defense/assets/hand_full_guide.jpg';
 
         return `
             <section class="screen instructions-screen pinch-instructions-screen">
@@ -133,6 +134,8 @@
                                     <span>Detected Hand</span>
                                     <strong id="pinchDetectedHand">${getDetectedHandLabel(handedness)}</strong>
                                 </div>
+                                <img class="pinch-full-guide-art" src="${guideAssetPath}" alt="Open hand guide for camera placement">
+                                <p class="pinch-full-guide-copy">Place the whole hand in front of the camera and keep it a little away from the lens so every fingertip stays visible.</p>
                                 ${getHandGuideMarkup(handedness)}
                             </div>
                         </section>
@@ -245,6 +248,7 @@
     }
 
     function renderPausedScreen({ training, progressPercent, latestScore, elapsedLabel }) {
+        const guideAssetPath = '/static/gamification/pinch_defense/assets/hand_full_guide.jpg';
         return `
             <section class="screen paused-shell">
                 <div class="paused-header">
@@ -286,6 +290,8 @@
                             <div class="screen-kicker">Tracking Pause</div>
                             <h2>Return Hand To Resume</h2>
                             <p>Your score, combo, and lane state are frozen. Recenter your hand, then resume when ready.</p>
+                            <img class="pinch-full-guide-art is-pause" src="${guideAssetPath}" alt="Open hand guide for camera placement during pause">
+                            <p class="pinch-full-guide-copy">Show the full hand to the camera and keep it slightly farther back instead of too close to the lens.</p>
                         </div>
                     </div>
                 </div>

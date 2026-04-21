@@ -70,6 +70,27 @@
     z-index: 2;
 }
 
+.pinch-full-guide-art {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 18px;
+    margin-top: 14px;
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.18);
+}
+
+.pinch-full-guide-art.is-pause {
+    margin-top: 18px;
+}
+
+.pinch-full-guide-copy {
+    margin: 12px 0 0;
+    color: var(--ink-soft);
+    font-size: 0.92rem;
+    line-height: 1.45;
+}
+
 .pinch-hand-guide {
     display: flex;
     gap: 10px;
