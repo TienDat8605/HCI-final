@@ -12,9 +12,33 @@
         return values.reduce((sum, value) => sum + value, 0) / values.length;
     }
 
+    function standardDeviation(values) {
+        if (!values.length) {
+            return 0;
+        }
+        const mean = average(values);
+        const variance = average(values.map((value) => (value - mean) ** 2));
+        return Math.sqrt(variance);
+    }
+
     function createEmptyFingerStats(config) {
         return config.fingerOrder.reduce((stats, fingerId) => {
             stats[fingerId] = { targets: 0, hits: 0, misses: 0 };
+            return stats;
+        }, {});
+    }
+
+    function createEmptyPerFingerQualityStats(config) {
+        return config.fingerOrder.reduce((stats, fingerId) => {
+            stats[fingerId] = {
+                completionValues: [],
+                reactionTimes: [],
+                confirmDurations: [],
+                holdStabilityValues: [],
+                validAttemptCount: 0,
+                assistedCount: 0,
+                invalidAttemptCount: 0,
+            };
             return stats;
         }, {});
     }
@@ -85,6 +109,12 @@
             waveTransitionUntilMs: 0,
             totalEnemies: config.waves.reduce((sum, wave) => sum + wave.enemies.length, 0),
             fingerStats: createEmptyFingerStats(config),
+            perFingerQualityStats: createEmptyPerFingerQualityStats(config),
+            qualityAttempts: [],
+            pendingAttempt: null,
+            lastTargetChangeAt: 0,
+            lastTrackedTargetFinger: null,
+            lastTrackedTargetToken: null,
             confirmedAttempts: 0,
             correctAttempts: 0,
             attemptLog: [],
@@ -214,6 +244,125 @@
             return 'GOOD';
         }
 
+        function startPendingAttempt(fingerId, nowMs) {
+            if (!fingerId) {
+                state.pendingAttempt = null;
+                return;
+            }
+            state.pendingAttempt = {
+                fingerId,
+                attemptStartedAt: nowMs,
+                movementOnsetAt: 0,
+                confirmedAt: 0,
+                bestCompletionRatio: 0,
+                bestNormalizedGap: Number.POSITIVE_INFINITY,
+                holdStability: 0,
+                wasCorrect: false,
+                wasAssisted: false,
+                invalidatedByTracking: false,
+            };
+            state.lastTargetChangeAt = nowMs;
+        }
+
+        function syncPendingAttemptFromDetector(nowMs) {
+            if (!state.pendingAttempt) {
+                return;
+            }
+            const fingerState = state.detectorStates[state.pendingAttempt.fingerId];
+            if (!fingerState) {
+                return;
+            }
+            state.pendingAttempt.bestCompletionRatio = Math.max(
+                state.pendingAttempt.bestCompletionRatio,
+                Number.isFinite(fingerState.completionRatio) ? fingerState.completionRatio : 0
+            );
+            if (Number.isFinite(fingerState.normalizedGap)) {
+                state.pendingAttempt.bestNormalizedGap = Math.min(
+                    state.pendingAttempt.bestNormalizedGap,
+                    fingerState.normalizedGap
+                );
+            }
+        }
+
+        function recordAttemptQuality(attempt) {
+            if (!attempt) {
+                return;
+            }
+            const reactionTimeMs = attempt.movementOnsetAt && attempt.attemptStartedAt
+                ? Math.max(0, attempt.movementOnsetAt - attempt.attemptStartedAt)
+                : 0;
+            const confirmDurationMs = attempt.confirmedAt && attempt.movementOnsetAt
+                ? Math.max(0, attempt.confirmedAt - attempt.movementOnsetAt)
+                : 0;
+
+            const normalizedAttempt = {
+                ...attempt,
+                bestCompletionRatio: Number.isFinite(attempt.bestCompletionRatio) ? attempt.bestCompletionRatio : 0,
+                bestNormalizedGap: Number.isFinite(attempt.bestNormalizedGap) ? attempt.bestNormalizedGap : null,
+                reactionTimeMs,
+                confirmDurationMs,
+                isValidQualityAttempt: Boolean(
+                    attempt.wasCorrect &&
+                    !attempt.invalidatedByTracking &&
+                    attempt.movementOnsetAt &&
+                    attempt.confirmedAt
+                ),
+            };
+
+            state.qualityAttempts.push(normalizedAttempt);
+            const fingerStats = state.perFingerQualityStats[attempt.fingerId];
+            if (!fingerStats) {
+                return;
+            }
+
+            if (attempt.invalidatedByTracking) {
+                fingerStats.invalidAttemptCount += 1;
+            }
+            if (normalizedAttempt.wasAssisted) {
+                fingerStats.assistedCount += 1;
+            }
+            if (!normalizedAttempt.isValidQualityAttempt) {
+                return;
+            }
+
+            fingerStats.validAttemptCount += 1;
+            fingerStats.completionValues.push(normalizedAttempt.bestCompletionRatio);
+            fingerStats.reactionTimes.push(normalizedAttempt.reactionTimeMs);
+            fingerStats.confirmDurations.push(normalizedAttempt.confirmDurationMs);
+            fingerStats.holdStabilityValues.push(normalizedAttempt.holdStability);
+        }
+
+        function finalizePendingAttempt(overrides) {
+            if (!state.pendingAttempt) {
+                return;
+            }
+            const attempt = {
+                ...state.pendingAttempt,
+                ...overrides,
+            };
+            recordAttemptQuality(attempt);
+            state.pendingAttempt = null;
+        }
+
+        function updateTargetAttemptWindow(nowMs) {
+            const frontEnemy = (!state.pendingRelease && state.activeEnemies.length)
+                ? state.activeEnemies.slice().sort((left, right) => left.x - right.x)[0]
+                : null;
+            const nextFinger = frontEnemy ? frontEnemy.sequence[frontEnemy.currentStep] : null;
+            const nextToken = frontEnemy ? `${frontEnemy.id}:${frontEnemy.currentStep}` : null;
+            if (state.lastTrackedTargetToken !== nextToken) {
+                state.lastTrackedTargetToken = nextToken;
+                state.lastTrackedTargetFinger = nextFinger;
+                if (nextFinger && nextToken) {
+                    startPendingAttempt(nextFinger, nowMs);
+                } else if (state.pendingAttempt) {
+                    finalizePendingAttempt({
+                        confirmedAt: state.pendingAttempt.confirmedAt || nowMs,
+                    });
+                }
+            }
+        }
+
         function defeatEnemy(enemy, nowMs) {
             state.enemiesDefeated += 1;
             state.score += enemy.baseScore;
@@ -223,7 +372,8 @@
             setTransient(`+${enemy.baseScore}`, nowMs, 700);
         }
 
-        function applyPinch(fingerId, nowMs) {
+        function applyPinch(event, nowMs) {
+            const fingerId = event.finger;
             state.confirmedAttempts += 1;
             state.activeFinger = fingerId;
             state.confirmedFinger = fingerId;
@@ -244,6 +394,16 @@
                 state.praiseText = 'TRY AGAIN';
                 state.statusText = 'Wrong target. Follow the front enemy symbol.';
                 setTransient('Wrong pinch', nowMs, 850);
+                finalizePendingAttempt({
+                    fingerId,
+                    movementOnsetAt: event.movementOnsetAt || nowMs,
+                    confirmedAt: nowMs,
+                    bestCompletionRatio: event.bestCompletionRatio || event.completionRatio || 0,
+                    bestNormalizedGap: Number.isFinite(event.bestNormalizedGap) ? event.bestNormalizedGap : event.normalizedGap,
+                    holdStability: Number.isFinite(event.holdStability) ? event.holdStability : 0,
+                    wasCorrect: false,
+                    wasAssisted: Boolean(event.assisted),
+                });
                 return;
             }
 
@@ -257,6 +417,17 @@
                 if (state.fingerStats[fingerId]) {
                     state.fingerStats[fingerId].hits += 1;
                 }
+            });
+
+            finalizePendingAttempt({
+                fingerId,
+                movementOnsetAt: event.movementOnsetAt || nowMs,
+                confirmedAt: nowMs,
+                bestCompletionRatio: event.bestCompletionRatio || event.completionRatio || 0,
+                bestNormalizedGap: Number.isFinite(event.bestNormalizedGap) ? event.bestNormalizedGap : event.normalizedGap,
+                holdStability: Number.isFinite(event.holdStability) ? event.holdStability : 0,
+                wasCorrect: true,
+                wasAssisted: Boolean(event.assisted),
             });
 
             const defeatedIds = new Set();
@@ -337,7 +508,7 @@
             } else if (state.activeEnemies.length) {
                 const focusLabel = config.fingers[state.currentFocusFinger].label;
                 state.cueTitle = `Target ${focusLabel.toLowerCase()} pinch first.`;
-                state.cueText = `Enemies on screen react together when their next symbol matches your pinch.`;
+                state.cueText = 'Enemies on screen react together when their next symbol matches your pinch.';
             } else if (state.waveActive) {
                 state.cueTitle = 'Prepare for the next enemy.';
                 state.cueText = 'Stay relaxed and keep the fingertips visible.';
@@ -357,72 +528,46 @@
             state.finishReason = reason;
             state.waveActive = false;
             state.activeEnemies = [];
+            if (state.pendingAttempt) {
+                finalizePendingAttempt({
+                    confirmedAt: state.pendingAttempt.confirmedAt || state.elapsedMs,
+                });
+            }
         }
 
-        function update(frame) {
-            if (!state.started || state.finished) {
-                return getSnapshot();
-            }
-            if (state.paused) {
-                return getSnapshot();
-            }
-
-            const nowMs = Math.max(0, state.elapsedMs + ((frame.deltaSeconds || 0) * 1000));
-            state.elapsedMs = nowMs;
-            state.handedness = frame.handedness || state.handedness;
-
-            const detectorOutput = detector.update(frame);
-            state.detectorStates = detectorOutput.states;
-            state.lastTrackingOk = detectorOutput.trackingOk;
-            state.activeFinger = detectorOutput.activeFinger;
-            state.handLandmarks = detectorOutput.landmarks || null;
-
-            detectorOutput.events.forEach((event) => {
-                if (event.type === 'pinch_confirmed') {
-                    applyPinch(event.finger, nowMs);
-                } else if (event.type === 'release_confirmed') {
-                    state.pendingRelease = false;
-                    state.confirmedFinger = null;
-                    state.activeFinger = null;
-                } else if (event.type === 'tracking_lost') {
-                    state.statusText = 'Tracking drifting. Hold position or pause will trigger.';
-                } else if (event.type === 'tracking_restored') {
-                    state.statusText = 'Tracking restored.';
-                }
+        function buildPerFingerQualitySummary() {
+            const summary = {};
+            config.fingerOrder.forEach((fingerId) => {
+                const stats = state.perFingerQualityStats[fingerId];
+                const enoughTrials = stats.validAttemptCount >= 3;
+                const completionMean = average(stats.completionValues);
+                const confirmDurationMean = average(stats.confirmDurations);
+                const completionCV = completionMean > 0 ? (standardDeviation(stats.completionValues) / completionMean) : 0;
+                const timingCV = confirmDurationMean > 0 ? (standardDeviation(stats.confirmDurations) / confirmDurationMean) : 0;
+                summary[fingerId] = {
+                    averageCompletion: Math.round(clamp(completionMean, 0, 1) * 100),
+                    bestCompletion: Math.round(clamp(Math.max(0, ...stats.completionValues, 0), 0, 1.15) * 100),
+                    averageReactionTimeMs: Math.round(average(stats.reactionTimes)),
+                    repeatabilityScore: enoughTrials
+                        ? Math.round(clamp(100 - (((completionCV * 55) + (timingCV * 45)) * 100), 0, 100))
+                        : null,
+                    validAttemptCount: stats.validAttemptCount,
+                    holdStability: Math.round(average(stats.holdStabilityValues)),
+                    assistedCount: stats.assistedCount,
+                    insufficientTrials: !enoughTrials,
+                };
             });
-
-            ensureWaveStarted(nowMs);
-            spawnEnemies(nowMs);
-            updateEnemyPositions(frame.deltaSeconds || 0);
-            updateFocus();
-            updateSampling(nowMs, detectorOutput.trackingOk);
-            updateStatus(nowMs, detectorOutput);
-
-            if (state.hp <= 0) {
-                markFinished(false, 'hp');
-            } else if (state.currentWaveIndex >= config.waves.length && !state.waveActive && !state.activeEnemies.length) {
-                markFinished(true, 'waves');
-            } else if (state.elapsedMs >= state.sessionDurationMs) {
-                markFinished(false, 'time');
-            }
-
-            return getSnapshot();
+            return summary;
         }
 
-        function pause() {
-            if (state.finished) {
-                return getSnapshot();
-            }
-            state.paused = true;
-            state.trackingInterruptions += 1;
-            state.statusText = 'Tracking paused. Return your hand and resume.';
-            return getSnapshot();
-        }
-
-        function resume() {
-            state.paused = false;
-            state.statusText = 'Tracking restored. Continue the defense.';
-            return getSnapshot();
+        function getQualityExtremes(perFingerQuality) {
+            const ranked = Object.entries(perFingerQuality)
+                .filter(([, entry]) => entry.validAttemptCount > 0)
+                .sort((left, right) => right[1].averageCompletion - left[1].averageCompletion);
+            return {
+                strongestCompletionFingerId: ranked[0]?.[0] || state.currentFocusFinger,
+                weakestCompletionFingerId: ranked[ranked.length - 1]?.[0] || state.currentFocusFinger,
+            };
         }
 
         function finalizeSummary(forceCompleted) {
@@ -435,6 +580,16 @@
             const notes = forceCompleted
                 ? 'Session cleared with fatigue-friendly pinch assist enabled.'
                 : 'Pinch assistance stayed active. Keep the camera framing wide and focus on the next required finger.';
+            const validQualityAttempts = state.qualityAttempts.filter((attempt) => attempt.isValidQualityAttempt);
+            const perFingerQuality = buildPerFingerQualitySummary();
+            const repeatabilityCandidates = Object.values(perFingerQuality).filter((entry) => entry.repeatabilityScore !== null);
+            const overallRepeatability = repeatabilityCandidates.length
+                ? Math.round(
+                    repeatabilityCandidates.reduce((sum, entry) => sum + (entry.repeatabilityScore * entry.validAttemptCount), 0) /
+                    repeatabilityCandidates.reduce((sum, entry) => sum + entry.validAttemptCount, 0)
+                )
+                : null;
+            const qualityExtremes = getQualityExtremes(perFingerQuality);
 
             return {
                 modeScore: state.score,
@@ -444,6 +599,8 @@
                 highestCombo: state.highestCombo,
                 strongestFinger: config.fingers[strongestFingerId].label,
                 weakestFinger: config.fingers[weakestFingerId].label,
+                strongestCompletionFinger: config.fingers[qualityExtremes.strongestCompletionFingerId].label,
+                weakestCompletionFinger: config.fingers[qualityExtremes.weakestCompletionFingerId].label,
                 frequentMissedInput: config.fingers[frequentMissedInputId].label,
                 trackingInterruptions: state.trackingInterruptions,
                 completedWaves: state.completedWaves,
@@ -452,6 +609,23 @@
                     ? Math.round((state.correctAttempts / state.confirmedAttempts) * 100)
                     : 0,
                 bestAccuracy: state.bestRollingAccuracy,
+                averageCompletion: validQualityAttempts.length
+                    ? Math.round(average(validQualityAttempts.map((attempt) => clamp(attempt.bestCompletionRatio, 0, 1) * 100)))
+                    : 0,
+                bestCompletion: validQualityAttempts.length
+                    ? Math.round(Math.max(...validQualityAttempts.map((attempt) => clamp(attempt.bestCompletionRatio, 0, 1.15) * 100)))
+                    : 0,
+                averageReactionTimeMs: validQualityAttempts.length
+                    ? Math.round(average(validQualityAttempts.map((attempt) => attempt.reactionTimeMs)))
+                    : 0,
+                averageHoldStability: validQualityAttempts.length
+                    ? Math.round(average(validQualityAttempts.map((attempt) => attempt.holdStability)))
+                    : 0,
+                repeatabilityScore: overallRepeatability,
+                repeatabilityLabel: overallRepeatability === null ? 'Insufficient repeated trials' : `${overallRepeatability}%`,
+                perFingerQuality,
+                qualityAttempts: state.qualityAttempts.slice(),
+                qualityAttemptCount: validQualityAttempts.length,
                 accuracyTrend: state.accuracyTrend.slice(),
                 stabilityTrend: state.stabilityTrend.slice(),
             };
@@ -464,6 +638,11 @@
             state.finished = true;
             state.completed = Boolean(payload && payload.completed) || state.completed;
             state.finishRequested = false;
+            if (state.pendingAttempt) {
+                finalizePendingAttempt({
+                    confirmedAt: state.pendingAttempt.confirmedAt || state.elapsedMs,
+                });
+            }
             state.summary = finalizeSummary(state.completed);
             return getSnapshot();
         }
@@ -536,6 +715,80 @@
 
         function start(payload) {
             resetForStart(payload);
+            return getSnapshot();
+        }
+
+        function update(frame) {
+            if (!state.started || state.finished) {
+                return getSnapshot();
+            }
+            if (state.paused) {
+                return getSnapshot();
+            }
+
+            const nowMs = Math.max(0, state.elapsedMs + ((frame.deltaSeconds || 0) * 1000));
+            state.elapsedMs = nowMs;
+            state.handedness = frame.handedness || state.handedness;
+
+            const detectorOutput = detector.update(frame);
+            state.detectorStates = detectorOutput.states;
+            state.lastTrackingOk = detectorOutput.trackingOk;
+            state.activeFinger = detectorOutput.activeFinger;
+            state.handLandmarks = detectorOutput.landmarks || null;
+            syncPendingAttemptFromDetector(nowMs);
+
+            detectorOutput.events.forEach((event) => {
+                if (event.type === 'pinch_confirmed') {
+                    applyPinch(event, nowMs);
+                } else if (event.type === 'release_confirmed') {
+                    state.pendingRelease = false;
+                    state.confirmedFinger = null;
+                    state.activeFinger = null;
+                } else if (event.type === 'tracking_lost') {
+                    state.statusText = 'Tracking drifting. Hold position or pause will trigger.';
+                    if (state.pendingAttempt) {
+                        state.pendingAttempt.invalidatedByTracking = true;
+                    }
+                } else if (event.type === 'tracking_restored') {
+                    state.statusText = 'Tracking restored.';
+                }
+            });
+
+            ensureWaveStarted(nowMs);
+            spawnEnemies(nowMs);
+            updateEnemyPositions(frame.deltaSeconds || 0);
+            updateFocus();
+            updateTargetAttemptWindow(nowMs);
+            updateSampling(nowMs, detectorOutput.trackingOk);
+            updateStatus(nowMs, detectorOutput);
+
+            if (state.hp <= 0) {
+                markFinished(false, 'hp');
+            } else if (state.currentWaveIndex >= config.waves.length && !state.waveActive && !state.activeEnemies.length) {
+                markFinished(true, 'waves');
+            } else if (state.elapsedMs >= state.sessionDurationMs) {
+                markFinished(false, 'time');
+            }
+
+            return getSnapshot();
+        }
+
+        function pause() {
+            if (state.finished) {
+                return getSnapshot();
+            }
+            state.paused = true;
+            state.trackingInterruptions += 1;
+            if (state.pendingAttempt) {
+                state.pendingAttempt.invalidatedByTracking = true;
+            }
+            state.statusText = 'Tracking paused. Return your hand and resume.';
+            return getSnapshot();
+        }
+
+        function resume() {
+            state.paused = false;
+            state.statusText = 'Tracking restored. Continue the defense.';
             return getSnapshot();
         }
 

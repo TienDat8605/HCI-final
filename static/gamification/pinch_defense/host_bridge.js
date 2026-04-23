@@ -304,15 +304,22 @@
         const completionNote = summary.completed
             ? `You cleared all ${gameSummary.completedWaves || 3} waves and finished the session.`
             : `The run ended at ${summary.completionPercent} percent completion.`;
-
         const trackingNote = gameSummary.trackingInterruptions
-            ? `Tracking paused ${gameSummary.trackingInterruptions} time(s), so keeping the hand centered should make the next run smoother.`
-            : 'Tracking stayed stable throughout the active run.';
+            ? `Tracking confidence was reduced by ${gameSummary.trackingInterruptions} pause(s), so the quality metrics should be read with some caution.`
+            : 'Tracking confidence stayed strong through the active run.';
+        const repeatabilityNote = gameSummary.repeatabilityScore === null || gameSummary.repeatabilityScore === undefined
+            ? 'Repeatability is still building because there were not enough clean repeated trials on the same finger.'
+            : `Repeatability settled near ${gameSummary.repeatabilityScore} percent. High completion with lower repeatability suggests good range but inconsistent control.`;
+        const reactionNote = gameSummary.averageReactionTimeMs
+            ? `Average reaction time between targets was about ${gameSummary.averageReactionTimeMs} ms. Slower reactions with good completion usually point more to switching or planning than to closure itself.`
+            : 'Reaction time could not be established from enough valid pinch switches.';
 
         return `
-            Average pinch accuracy settled near ${Math.round(summary.averageAccuracy)} percent.
+            Average pinch completion settled near ${Math.round(gameSummary.averageCompletion || 0)} percent, with the best closure reaching ${Math.round(gameSummary.bestCompletion || 0)} percent.
             ${completionNote}
-            The weakest finger during targets was the ${String(summary.weakestFinger).toLowerCase()} finger, while the highest combo reached x${gameSummary.highestCombo || 0}.
+            The strongest completion came from the ${String(gameSummary.strongestCompletionFinger || summary.strongestFinger).toLowerCase()} finger, while the weakest completion came from the ${String(gameSummary.weakestCompletionFinger || summary.weakestFinger).toLowerCase()} finger.
+            ${reactionNote}
+            ${repeatabilityNote}
             ${trackingNote}
         `.trim();
     }

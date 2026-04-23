@@ -1,12 +1,46 @@
 (function initPinchDefenseInput(globalObject) {
     'use strict';
 
+    const THUMB_MCP_INDEX = 2;
+    const THUMB_IP_INDEX = 3;
+    const THUMB_TIP_INDEX = 4;
+    const MOVEMENT_ONSET_DELTA = 0.08;
+    const MOVEMENT_ONSET_CONFIRM_FRAMES = 2;
+
+    function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
     function distance3(a, b) {
         return Math.sqrt(
             ((a.x || 0) - (b.x || 0)) ** 2 +
             ((a.y || 0) - (b.y || 0)) ** 2 +
             ((a.z || 0) - (b.z || 0)) ** 2
         );
+    }
+
+    function subtract3(a, b) {
+        return {
+            x: (a.x || 0) - (b.x || 0),
+            y: (a.y || 0) - (b.y || 0),
+            z: (a.z || 0) - (b.z || 0),
+        };
+    }
+
+    function add3(a, b) {
+        return {
+            x: (a.x || 0) + (b.x || 0),
+            y: (a.y || 0) + (b.y || 0),
+            z: (a.z || 0) + (b.z || 0),
+        };
+    }
+
+    function scale3(vector, scalar) {
+        return {
+            x: (vector.x || 0) * scalar,
+            y: (vector.y || 0) * scalar,
+            z: (vector.z || 0) * scalar,
+        };
     }
 
     function average(values) {
@@ -16,12 +50,33 @@
         return values.reduce((sum, value) => sum + value, 0) / values.length;
     }
 
+    function standardDeviation(values) {
+        if (!values.length) {
+            return 0;
+        }
+        const mean = average(values);
+        const variance = average(values.map((value) => (value - mean) ** 2));
+        return Math.sqrt(variance);
+    }
+
+    function getFingerChain(fingerConfig) {
+        return {
+            pipIndex: fingerConfig.tipIndex - 2,
+            dipIndex: fingerConfig.tipIndex - 1,
+            tipIndex: fingerConfig.tipIndex,
+        };
+    }
+
     function createFingerState(config, fingerId) {
         const fingerConfig = config.fingers[fingerId];
         return {
             fingerId,
             label: fingerConfig.label,
             normalizedDistance: null,
+            normalizedGap: null,
+            completionRatio: 0,
+            padCenter: null,
+            padRadius: 0,
             state: 'idle',
             heldMs: 0,
             releaseHeldMs: 0,
@@ -44,6 +99,12 @@
             candidateFinger: null,
             candidateSince: 0,
             candidateAssisted: false,
+            candidateBaselineCompletion: 0,
+            candidateMovementFrames: 0,
+            candidateMovementOnsetAt: 0,
+            candidateBestCompletionRatio: 0,
+            candidateBestNormalizedGap: Number.POSITIVE_INFINITY,
+            candidateSamples: [],
             lastConfirmAt: 0,
             allClearSince: 0,
             lastTrackingEvent: null,
@@ -53,6 +114,12 @@
             runtime.candidateFinger = null;
             runtime.candidateSince = 0;
             runtime.candidateAssisted = false;
+            runtime.candidateBaselineCompletion = 0;
+            runtime.candidateMovementFrames = 0;
+            runtime.candidateMovementOnsetAt = 0;
+            runtime.candidateBestCompletionRatio = 0;
+            runtime.candidateBestNormalizedGap = Number.POSITIVE_INFINITY;
+            runtime.candidateSamples = [];
         }
 
         function getPalmScale(landmarks) {
@@ -72,9 +139,25 @@
                 fingerState.releaseHeldMs = 0;
                 fingerState.assisted = false;
                 fingerState.normalizedDistance = null;
+                fingerState.normalizedGap = null;
+                fingerState.completionRatio = 0;
+                fingerState.padCenter = null;
+                fingerState.padRadius = 0;
             });
             resetCandidate();
             runtime.allClearSince = 0;
+        }
+
+        function computeThumbPad(landmarks) {
+            const tip = landmarks[THUMB_TIP_INDEX];
+            const ip = landmarks[THUMB_IP_INDEX];
+            const distalVector = subtract3(tip, ip);
+            const distalLength = distance3(tip, ip);
+            return {
+                distalLength,
+                padCenter: add3(tip, scale3(distalVector, 0.35)),
+                padRadius: distalLength * 0.42,
+            };
         }
 
         function emitTrackingEvents(now, trackingOk, events) {
@@ -120,46 +203,63 @@
                 };
             }
 
-            const thumbTip = frame.landmarks[4];
+            const thumbTip = frame.landmarks[THUMB_TIP_INDEX];
+            const thumbPad = computeThumbPad(frame.landmarks);
             const candidates = [];
             let allClear = true;
 
             fingerIds.forEach((fingerId) => {
                 const fingerConfig = config.fingers[fingerId];
                 const fingerState = perFinger[fingerId];
-                const normalizedDistance = distance3(thumbTip, frame.landmarks[fingerConfig.tipIndex]) / palmScale;
+                const fingerChain = getFingerChain(fingerConfig);
+                const fingerTip = frame.landmarks[fingerChain.tipIndex];
+                const fingerDip = frame.landmarks[fingerChain.dipIndex];
+                const distalVector = subtract3(fingerTip, fingerDip);
+                const distalLength = distance3(fingerTip, fingerDip);
+                const fingerPadCenter = add3(fingerTip, scale3(distalVector, 0.5));
+                const fingerPadRadius = distalLength * 0.38;
+                const rawGap = Math.max(0, distance3(thumbPad.padCenter, fingerPadCenter) - (thumbPad.padRadius + fingerPadRadius));
+                const normalizedGap = rawGap / palmScale;
+                const normalizedDistance = distance3(thumbTip, fingerTip) / palmScale;
+                const completionRatio = clamp(1 - (normalizedGap / fingerConfig.pinchThreshold), 0, 1.15);
                 const relaxedThreshold = fingerConfig.pinchThreshold + config.pinch.relaxedBuffer;
                 const releaseThreshold = fingerConfig.pinchThreshold + config.pinch.releaseBuffer;
                 const approachThreshold = fingerConfig.pinchThreshold + config.pinch.approachBuffer;
 
                 fingerState.normalizedDistance = normalizedDistance;
+                fingerState.normalizedGap = normalizedGap;
+                fingerState.completionRatio = completionRatio;
+                fingerState.padCenter = fingerPadCenter;
+                fingerState.padRadius = fingerPadRadius;
                 fingerState.assisted = false;
-                fingerState.releaseHeldMs = normalizedDistance > releaseThreshold
+                fingerState.releaseHeldMs = normalizedGap > releaseThreshold
                     ? (runtime.allClearSince ? now - runtime.allClearSince : 0)
                     : 0;
 
-                if (normalizedDistance > releaseThreshold) {
-                    fingerState.state = normalizedDistance <= approachThreshold ? 'approaching' : 'released';
-                } else if (normalizedDistance <= fingerConfig.pinchThreshold) {
+                if (normalizedGap > releaseThreshold) {
+                    fingerState.state = normalizedGap <= approachThreshold ? 'approaching' : 'released';
+                } else if (normalizedGap <= fingerConfig.pinchThreshold) {
                     fingerState.state = 'pinched';
-                } else if (normalizedDistance <= relaxedThreshold) {
+                } else if (normalizedGap <= relaxedThreshold) {
                     fingerState.state = 'approaching';
                     fingerState.assisted = true;
-                } else if (normalizedDistance <= approachThreshold) {
+                } else if (normalizedGap <= approachThreshold) {
                     fingerState.state = 'approaching';
                 } else {
                     fingerState.state = 'idle';
                 }
 
-                if (normalizedDistance <= relaxedThreshold) {
+                if (normalizedGap <= relaxedThreshold) {
                     candidates.push({
                         fingerId,
                         normalizedDistance,
-                        strict: normalizedDistance <= fingerConfig.pinchThreshold,
+                        normalizedGap,
+                        completionRatio,
+                        strict: normalizedGap <= fingerConfig.pinchThreshold,
                     });
                 }
 
-                if (normalizedDistance <= releaseThreshold) {
+                if (normalizedGap <= releaseThreshold) {
                     allClear = false;
                 }
             });
@@ -197,13 +297,13 @@
                 };
             }
 
-            candidates.sort((a, b) => a.normalizedDistance - b.normalizedDistance);
+            candidates.sort((a, b) => a.normalizedGap - b.normalizedGap);
             const bestCandidate = candidates[0] || null;
             const runnerUp = candidates[1] || null;
             const isAmbiguous = Boolean(
                 bestCandidate &&
                 runnerUp &&
-                runnerUp.normalizedDistance - bestCandidate.normalizedDistance < config.pinch.ambiguityMargin
+                runnerUp.normalizedGap - bestCandidate.normalizedGap < config.pinch.ambiguityMargin
             );
 
             if (!bestCandidate || isAmbiguous || now - runtime.lastConfirmAt < config.pinch.interConfirmGapMs) {
@@ -213,7 +313,7 @@
                 });
                 return {
                     trackingOk: true,
-                    activeFinger: isAmbiguous ? null : null,
+                    activeFinger: null,
                     states: perFinger,
                     landmarks: frame.landmarks,
                     events,
@@ -222,28 +322,68 @@
 
             const bestConfig = config.fingers[bestCandidate.fingerId];
             const relaxedThreshold = bestConfig.pinchThreshold + config.pinch.relaxedBuffer;
-            const assistedCandidate = bestCandidate.normalizedDistance > bestConfig.pinchThreshold &&
-                bestCandidate.normalizedDistance <= relaxedThreshold;
+            const assistedCandidate = bestCandidate.normalizedGap > bestConfig.pinchThreshold &&
+                bestCandidate.normalizedGap <= relaxedThreshold;
 
             if (runtime.candidateFinger !== bestCandidate.fingerId) {
                 runtime.candidateFinger = bestCandidate.fingerId;
                 runtime.candidateSince = now;
                 runtime.candidateAssisted = assistedCandidate;
+                runtime.candidateBaselineCompletion = perFinger[bestCandidate.fingerId].completionRatio;
+                runtime.candidateMovementFrames = 0;
+                runtime.candidateMovementOnsetAt = 0;
+                runtime.candidateBestCompletionRatio = perFinger[bestCandidate.fingerId].completionRatio;
+                runtime.candidateBestNormalizedGap = perFinger[bestCandidate.fingerId].normalizedGap;
+                runtime.candidateSamples = [];
             } else if (assistedCandidate) {
                 runtime.candidateAssisted = true;
             }
 
             const heldMs = now - runtime.candidateSince;
+            const activeFingerState = perFinger[bestCandidate.fingerId];
+            runtime.candidateBestCompletionRatio = Math.max(
+                runtime.candidateBestCompletionRatio,
+                activeFingerState.completionRatio
+            );
+            runtime.candidateBestNormalizedGap = Math.min(
+                runtime.candidateBestNormalizedGap,
+                activeFingerState.normalizedGap
+            );
+            runtime.candidateSamples.push({
+                at: now,
+                normalizedGap: activeFingerState.normalizedGap,
+            });
+            if (runtime.candidateSamples.length > 24) {
+                runtime.candidateSamples.shift();
+            }
+
+            const completionGain = activeFingerState.completionRatio - runtime.candidateBaselineCompletion;
+            if (completionGain >= MOVEMENT_ONSET_DELTA) {
+                runtime.candidateMovementFrames += 1;
+                if (!runtime.candidateMovementOnsetAt && runtime.candidateMovementFrames >= MOVEMENT_ONSET_CONFIRM_FRAMES) {
+                    runtime.candidateMovementOnsetAt = now;
+                }
+            } else {
+                runtime.candidateMovementFrames = 0;
+            }
+
             fingerIds.forEach((fingerId) => {
                 perFinger[fingerId].heldMs = fingerId === bestCandidate.fingerId ? heldMs : 0;
             });
 
             const confirmHoldMs = runtime.candidateAssisted ? config.pinch.relaxedHoldMs : config.pinch.confirmHoldMs;
             if (heldMs >= confirmHoldMs) {
-                const fingerState = perFinger[bestCandidate.fingerId];
-                fingerState.state = 'confirmed';
-                fingerState.assisted = runtime.candidateAssisted;
-                fingerState.lastConfirmedAt = now;
+                const holdWindow = runtime.candidateSamples
+                    .filter((sample) => now - sample.at <= confirmHoldMs)
+                    .map((sample) => sample.normalizedGap);
+                const holdStability = clamp(
+                    100 - ((standardDeviation(holdWindow) / Math.max(bestConfig.pinchThreshold, 0.0001)) * 100),
+                    0,
+                    100
+                );
+                activeFingerState.state = 'confirmed';
+                activeFingerState.assisted = runtime.candidateAssisted;
+                activeFingerState.lastConfirmedAt = now;
                 runtime.lastConfirmAt = now;
                 runtime.waitingForRelease = true;
                 runtime.waitingSince = now;
@@ -252,6 +392,12 @@
                     finger: bestCandidate.fingerId,
                     assisted: runtime.candidateAssisted,
                     normalizedDistance: bestCandidate.normalizedDistance,
+                    normalizedGap: bestCandidate.normalizedGap,
+                    completionRatio: activeFingerState.completionRatio,
+                    bestCompletionRatio: runtime.candidateBestCompletionRatio,
+                    bestNormalizedGap: runtime.candidateBestNormalizedGap,
+                    movementOnsetAt: runtime.candidateMovementOnsetAt || now,
+                    holdStability,
                     at: now,
                 });
                 resetCandidate();
