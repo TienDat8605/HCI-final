@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Flask server for the Hand Exercise Recovery Assistant.
-Serves the web UI, reference exercise data, and video clips.
+Serves the rehab API, reference exercise data, and video clips.
 """
 
 import json
@@ -26,7 +26,7 @@ EXERCISE_GAME_MODES = {
     6: "pinch_defense_mode",
 }
 
-app = Flask(__name__, static_folder=STATIC_DIR)
+app = Flask(__name__)
 
 # Pre-load reference landmarks
 _ref_cache = {}
@@ -83,11 +83,16 @@ def is_supported_exercise(exercise_id):
 
 @app.route("/")
 def index():
-    return send_from_directory(STATIC_DIR, "index.html")
+    return jsonify(
+        {
+            "message": "Flask now serves the rehab API only.",
+            "frontend": "Run the Next.js app and open http://localhost:3000 for the React UI.",
+        }
+    )
 
 
-@app.route("/static/<path:filename>")
-def static_files(filename):
+@app.route("/legacy-static/<path:filename>")
+def get_legacy_static(filename):
     return send_from_directory(STATIC_DIR, filename)
 
 

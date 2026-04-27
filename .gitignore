@@ -10,6 +10,11 @@ env/
 ENV/
 .idea/
 .vscode/
+node_modules/
+.next/
+out/
+.env.local
+*.tsbuildinfo
 
 data/landmarks/
 data/keyframes/

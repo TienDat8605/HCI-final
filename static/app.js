@@ -77,6 +77,9 @@ const SPREAD_SCORE_DECAY = 0.11;
 const POSE_SHAPE_DECAY = 0.34;
 const PROCESSING_FRAME_MS = 48;
 const MATCH_SEARCH_AHEAD = 8;
+const SPLINE_SCENE_URL = 'https://prod.spline.design/ald6hYpWkMTV87jw/scene.splinecode';
+const INTRO_AUTO_ADVANCE_THRESHOLD = 0.96;
+const INTRO_AUTO_ADVANCE_DELAY_MS = 280;
 const FALLBACK_GAME_HUD = {
     primaryLabel: 'Mode Score',
     primaryValue: '0',
@@ -112,6 +115,13 @@ const appState = {
     currentSummary: null,
     lastSessionSummary: null,
     toastTimeout: null,
+    intro: {
+        cleanup: null,
+        raf: 0,
+        autoAdvanceTimer: 0,
+        autoAdvanced: false,
+        progress: 0,
+    },
 };
 
 const dom = {
@@ -285,6 +295,7 @@ function getExerciseCopy(exercise) {
 }
 
 function updateShell() {
+    document.body.dataset.screen = appState.screen;
     dom.cameraStatusDot.classList.toggle('is-live', appState.cameraRunning);
     dom.cameraStatusText.textContent = appState.cameraRunning ? 'Camera live' : 'Camera offline';
 
@@ -306,6 +317,34 @@ function updateShell() {
     dom.navItems.forEach((item) => {
         item.classList.toggle('is-active', item.dataset.nav === activeNav);
     });
+}
+
+function getIntroDestinationScreen() {
+    return appState.cameraRunning ? 'zones' : 'instructions';
+}
+
+function advanceFromBoot(trigger = 'button') {
+    if (appState.screen !== 'boot') return;
+    setScreen(getIntroDestinationScreen());
+
+    if (trigger === 'scroll' && !appState.cameraRunning) {
+        showToast('Enable the camera on the next screen when you are ready for gesture tracking.');
+    }
+}
+
+function renderCameraAssistCard(copy = {}) {
+    if (appState.cameraRunning) return '';
+
+    const title = copy.title || 'Camera Needed For Live Tracking';
+    const body = copy.body || 'Enable the camera to use gesture zones, hand overlays, and automatic pause detection.';
+
+    return `
+        <div class="camera-callout">
+            <strong>${title}</strong>
+            <p>${body}</p>
+            <button class="button button-primary" type="button" data-action="enable-camera">Enable Camera</button>
+        </div>
+    `;
 }
 
 function getScreenZoneConfig() {
@@ -422,36 +461,83 @@ function refreshCameraStage() {
 }
 
 function renderBootScreen() {
+    const primaryButton = appState.cameraRunning
+        ? '<button class="button button-primary" type="button" data-action="enter-tutorial">Open Gesture Tutorial</button>'
+        : '<button class="button button-primary" type="button" data-action="enable-camera">Enable Camera</button>';
+    const statusMessage = appState.cameraRunning
+        ? 'Camera is live. Scroll forward and the tutorial will open automatically.'
+        : 'Camera access is optional for the 3D intro and required for gesture navigation.';
+
     return `
-        <section class="screen boot-screen">
-            <div class="boot-card">
-                <div class="screen-kicker">Blueprint Recovery Flow</div>
-                <h2>Camera-Led Hand Training</h2>
-                <p>
-                    This version replaces the old split-screen workflow with a staged experience:
-                    hand-position zones, a reference instruction view, full-screen live coaching with landmark guidance,
-                    automatic pause when the hand leaves the frame, and a session summary at the end.
-                </p>
-                <div class="boot-grid">
-                    <div class="boot-stat">
-                        <strong>Navigation</strong>
-                        <span>Hold in zone for 2.5s</span>
+        <section class="screen spline-intro-screen">
+            <div id="splineIntroShell" class="spline-intro-shell">
+                <div class="spline-intro-sticky">
+                    <div class="spline-intro-backdrop"></div>
+                    <div id="splineIntroOverlay" class="spline-intro-overlay"></div>
+
+                    <div class="spline-intro-grid">
+                        <section id="splineIntroCopy" class="spline-intro-copy">
+                            <div class="screen-kicker">Blueprint Recovery Flow</div>
+                            <h1 class="spline-intro-title">Scroll Into The Clinic</h1>
+                            <p class="spline-intro-body">
+                                This replaces the old loading screen with your 3D clinic entrance. Scroll forward to zoom in,
+                                then hand off into the existing tutorial, exercise instructions, and live rehab session flow.
+                            </p>
+
+                            <div class="spline-intro-metrics">
+                                <div class="spline-intro-metric">
+                                    <strong>Gesture tutorial</strong>
+                                    <span>Zone hold onboarding</span>
+                                </div>
+                                <div class="spline-intro-metric">
+                                    <strong>3D handoff</strong>
+                                    <span>Scroll-driven clinic zoom</span>
+                                </div>
+                                <div class="spline-intro-metric">
+                                    <strong>Live coaching</strong>
+                                    <span>Camera plus landmark guidance</span>
+                                </div>
+                            </div>
+
+                            <div class="button-row">
+                                ${primaryButton}
+                                <button class="button button-secondary" type="button" data-action="skip-boot">Skip 3D Intro</button>
+                            </div>
+
+                            <div class="sr-message">${statusMessage}</div>
+                        </section>
+
+                        <section class="spline-intro-stage-shell" aria-label="3D clinic intro">
+                            <div id="splineIntroStage" class="spline-intro-stage">
+                                <div id="splineIntroViewer" class="spline-intro-viewer">
+                                    <spline-viewer
+                                        url="${SPLINE_SCENE_URL}"
+                                        loading="eager"
+                                    ></spline-viewer>
+                                </div>
+                                <div class="spline-intro-vignette"></div>
+                                <div class="spline-intro-stage-label">
+                                    <span>Clinic approach sequence</span>
+                                    <strong>Scroll to zoom deeper</strong>
+                                </div>
+                            </div>
+                        </section>
                     </div>
-                    <div class="boot-stat">
-                        <strong>Training</strong>
-                        <span>Single live camera view</span>
+
+                    <div class="spline-intro-footer">
+                        <div class="spline-intro-progress">
+                            <span>Intro Progress</span>
+                            <div class="spline-intro-progress-track">
+                                <div id="splineIntroMeterFill" class="spline-intro-progress-fill"></div>
+                            </div>
+                        </div>
+                        <div id="splineIntroHint" class="spline-intro-hint">Scroll to zoom into the clinic.</div>
                     </div>
-                    <div class="boot-stat">
-                        <strong>Guidance</strong>
-                        <span>Reference clip + live landmarks</span>
+
+                    <div id="splineIntroFinal" class="spline-intro-final">
+                        <strong>Tutorial handoff armed</strong>
+                        <span>Keep scrolling and we will move straight into the rehab walkthrough.</span>
                     </div>
-                </div>
-                <div class="button-row">
-                    <button class="button button-primary" type="button" data-action="enable-camera">Enable Camera</button>
-                    <button class="button button-secondary" type="button" data-action="skip-boot">Open Interface</button>
-                </div>
-                <div class="sr-message">
-                    Camera access is required for zone navigation, live overlays, and automatic pause detection.
                 </div>
             </div>
         </section>
@@ -474,6 +560,11 @@ function renderZonesScreen() {
 
             <div class="zones-layout">
                 <section class="zones-info">
+                    ${renderCameraAssistCard({
+                        title: 'Turn On The Camera For Zone Practice',
+                        body: 'The tutorial works best with live hand tracking so the left, center, right, and top hold zones can respond in real time.',
+                    })}
+
                     <div class="zones-list">
                         <div class="card">
                             <strong>Center hold</strong>
@@ -567,6 +658,11 @@ function renderInstructionScreen() {
                                 <span>${appState.guideFrames.length || '--'}</span>
                             </div>
                         </div>
+
+                        ${renderCameraAssistCard({
+                            title: 'Enable Camera Before Starting',
+                            body: 'You can browse the exercise without it, but live coaching, pause detection, and zone controls all need camera access.',
+                        })}
 
                         ${showWarning ? `
                             <div class="asset-warning">
@@ -904,6 +1000,7 @@ function renderSummaryScreen() {
 
 function render() {
     updateShell();
+    teardownBootExperience();
 
     let html = '';
     switch (appState.screen) {
@@ -931,6 +1028,9 @@ function render() {
     dom.screenRoot.innerHTML = html;
     mountPersistentMedia();
     bindActions();
+    if (appState.screen === 'boot') {
+        setupBootExperience();
+    }
     updateZoneUI();
     updateTrainingUI();
     refreshCameraStage();
@@ -947,13 +1047,24 @@ function bindActions() {
 async function handleAction(action) {
     switch (action) {
         case 'enable-camera':
-            await startCamera();
-            if (appState.cameraRunning) {
-                setScreen('zones');
+            {
+                const originScreen = appState.screen;
+                await startCamera();
+                if (appState.cameraRunning) {
+                    if (originScreen === 'boot') {
+                        setScreen('zones');
+                    } else {
+                        render();
+                        showToast('Camera is live.');
+                    }
+                }
             }
             break;
+        case 'enter-tutorial':
+            advanceFromBoot('button');
+            break;
         case 'skip-boot':
-            setScreen(appState.cameraRunning ? 'zones' : 'instructions');
+            advanceFromBoot('button');
             break;
         case 'skip-tutorial':
         case 'goto-instructions':
@@ -986,6 +1097,126 @@ async function handleAction(action) {
 function setScreen(screen) {
     appState.screen = screen;
     render();
+    window.scrollTo({ top: 0, behavior: 'auto' });
+}
+
+function teardownBootExperience() {
+    const intro = appState.intro;
+    if (!intro) return;
+
+    if (intro.cleanup) {
+        intro.cleanup();
+        intro.cleanup = null;
+    }
+
+    if (intro.autoAdvanceTimer) {
+        window.clearTimeout(intro.autoAdvanceTimer);
+        intro.autoAdvanceTimer = 0;
+    }
+
+    if (intro.raf) {
+        window.cancelAnimationFrame(intro.raf);
+        intro.raf = 0;
+    }
+
+    intro.autoAdvanced = false;
+    intro.progress = 0;
+}
+
+function setupBootExperience() {
+    const introShell = dom.screenRoot.querySelector('#splineIntroShell');
+    const introStage = dom.screenRoot.querySelector('#splineIntroStage');
+    const introViewer = dom.screenRoot.querySelector('#splineIntroViewer');
+    const introCopy = dom.screenRoot.querySelector('#splineIntroCopy');
+    const introOverlay = dom.screenRoot.querySelector('#splineIntroOverlay');
+    const introHint = dom.screenRoot.querySelector('#splineIntroHint');
+    const introMeterFill = dom.screenRoot.querySelector('#splineIntroMeterFill');
+    const introFinal = dom.screenRoot.querySelector('#splineIntroFinal');
+
+    if (!introShell || !introStage || !introViewer) return;
+
+    const intro = appState.intro;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const clearAdvanceTimer = () => {
+        if (intro.autoAdvanceTimer) {
+            window.clearTimeout(intro.autoAdvanceTimer);
+            intro.autoAdvanceTimer = 0;
+        }
+    };
+
+    const updateIntroFrame = () => {
+        const rect = introShell.getBoundingClientRect();
+        const totalScrollable = Math.max(1, rect.height - window.innerHeight);
+        const rawProgress = clamp((-rect.top) / totalScrollable, 0, 1);
+        const easedProgress = prefersReducedMotion
+            ? rawProgress
+            : 1 - Math.pow(1 - rawProgress, 3);
+
+        intro.progress = rawProgress;
+
+        const scale = 1 + easedProgress * 2.15;
+        const translateY = easedProgress * -12;
+        const copyOpacity = clamp(1 - rawProgress * 1.55, 0, 1);
+        const overlayOpacity = clamp(rawProgress * 1.18, 0, 0.78);
+
+        introViewer.style.transform = `translate3d(0, ${translateY}%, 0) scale(${scale})`;
+        introStage.style.setProperty('--intro-progress', rawProgress.toFixed(4));
+
+        if (introCopy) {
+            introCopy.style.opacity = copyOpacity.toFixed(3);
+            introCopy.style.transform = `translate3d(0, ${Math.round(rawProgress * -32)}px, 0)`;
+        }
+
+        if (introOverlay) {
+            introOverlay.style.opacity = overlayOpacity.toFixed(3);
+        }
+
+        if (introMeterFill) {
+            introMeterFill.style.width = `${Math.round(rawProgress * 100)}%`;
+        }
+
+        if (introHint) {
+            introHint.textContent = rawProgress >= 0.82
+                ? 'Preparing tutorial handoff...'
+                : rawProgress >= 0.36
+                    ? 'Keep scrolling to enter the clinic.'
+                    : 'Scroll to zoom into the clinic.';
+        }
+
+        if (introFinal) {
+            introFinal.classList.toggle('is-visible', rawProgress >= 0.78);
+        }
+
+        if (rawProgress >= INTRO_AUTO_ADVANCE_THRESHOLD && !intro.autoAdvanced) {
+            intro.autoAdvanced = true;
+            clearAdvanceTimer();
+            intro.autoAdvanceTimer = window.setTimeout(() => {
+                advanceFromBoot('scroll');
+            }, INTRO_AUTO_ADVANCE_DELAY_MS);
+        } else if (rawProgress < INTRO_AUTO_ADVANCE_THRESHOLD - 0.08) {
+            intro.autoAdvanced = false;
+            clearAdvanceTimer();
+        }
+    };
+
+    const requestIntroUpdate = () => {
+        if (intro.raf) return;
+        intro.raf = window.requestAnimationFrame(() => {
+            intro.raf = 0;
+            updateIntroFrame();
+        });
+    };
+
+    window.addEventListener('scroll', requestIntroUpdate, { passive: true });
+    window.addEventListener('resize', requestIntroUpdate);
+    requestIntroUpdate();
+
+    intro.cleanup = () => {
+        window.removeEventListener('scroll', requestIntroUpdate);
+        window.removeEventListener('resize', requestIntroUpdate);
+        clearAdvanceTimer();
+    };
 }
 
 async function fetchExercises() {
