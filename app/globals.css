@@ -1149,6 +1149,74 @@ body[data-screen="boot"] .screen-root {
     padding: 14px;
 }
 
+.pinch-defense-briefing {
+    height: 100%;
+    display: grid;
+    gap: 14px;
+    padding: 18px;
+    background:
+        radial-gradient(circle at top right, rgba(137, 210, 220, 0.2), transparent 34%),
+        linear-gradient(180deg, rgba(16, 29, 66, 0.96), rgba(11, 21, 44, 0.92));
+    color: var(--white);
+}
+
+.pinch-defense-briefing-head {
+    display: grid;
+    gap: 8px;
+}
+
+.pinch-defense-briefing-head span,
+.pinch-defense-map-card small,
+.pinch-defense-briefing-foot span {
+    color: var(--secondary-soft);
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+
+.pinch-defense-briefing-head strong {
+    font-family: var(--font-space-grotesk), sans-serif;
+    font-size: 1.45rem;
+    text-transform: uppercase;
+    letter-spacing: -0.05em;
+}
+
+.pinch-defense-briefing-head p,
+.pinch-defense-briefing-foot p {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.6;
+}
+
+.pinch-defense-map-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.pinch-defense-map-card {
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.08);
+    border-top: 4px solid var(--pinch-accent, var(--secondary-soft));
+    display: grid;
+    gap: 8px;
+}
+
+.pinch-defense-map-card strong {
+    font-family: var(--font-space-grotesk), sans-serif;
+    font-size: 1.1rem;
+    text-transform: uppercase;
+}
+
+.pinch-defense-briefing-foot {
+    margin-top: auto;
+    display: grid;
+    gap: 10px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(137, 210, 220, 0.24);
+}
+
 .stage-hints {
     position: absolute;
     top: 12px;

@@ -32,7 +32,6 @@ const EXERCISE_COPY: Record<number, { label: string; overview: string; guidance:
   6: {
     label: 'Pinch Defense - Runtime',
     overview: 'A gamified rehab mode centered on quick, controlled pinches and confident releases.',
-    guidance: 'This mode still runs on the legacy game runtime, but React now drives the surrounding UI and MediaPipe hand feed.',
     tips: [
       'Use small, confident pinches instead of snapping the hand closed.',
       'Stay centered in frame for cleaner feedback.',
@@ -40,6 +39,13 @@ const EXERCISE_COPY: Record<number, { label: string; overview: string; guidance:
     ],
   },
 };
+
+const PINCH_DEFENSE_FINGER_MAP = [
+  { symbol: 'Circle', finger: 'Index', color: '#4d88ff' },
+  { symbol: 'Triangle', finger: 'Middle', color: '#22c55e' },
+  { symbol: 'Square', finger: 'Ring', color: '#facc15' },
+  { symbol: 'Diamond', finger: 'Pinky', color: '#ef4444' },
+] as const;
 
 type ZoneKey = 'top' | 'left' | 'center' | 'right';
 const ZONE_HOLD_MS = 2500;
@@ -310,6 +316,38 @@ function ReferenceFrame({ src, emptyMessage }: ReferenceFrameProps) {
   );
 }
 
+function PinchDefenseBriefing() {
+  return (
+    <div className="pinch-defense-briefing">
+      <div className="pinch-defense-briefing-head">
+        <span>Adaptive pinch support enabled</span>
+        <p>
+          Pinch Defense starts from the legacy runtime, so this mode uses live camera tracking and the
+          finger map below instead of a prerecorded guide video.
+        </p>
+      </div>
+
+      <div className="pinch-defense-map-grid">
+        {PINCH_DEFENSE_FINGER_MAP.map((item) => (
+          <div
+            key={item.finger}
+            className="pinch-defense-map-card"
+            style={{ '--pinch-accent': item.color } as CSSProperties}
+          >
+            <small>{item.symbol}</small>
+            <strong>{item.finger}</strong>
+          </div>
+        ))}
+      </div>
+
+      <div className="pinch-defense-briefing-foot">
+        <p>Place the whole hand in front of the camera and keep every fingertip visible before starting.</p>
+        <span>Start flow: hold center after the camera locks on.</span>
+      </div>
+    </div>
+  );
+}
+
 function ZoneCards({
   zones,
   zoneState,
@@ -411,6 +449,7 @@ export function RehabWorkspace() {
   const exerciseCopy = getExerciseCopy(currentExercise);
   const currentGuideCount = Math.max(guideFrames.length, 4);
   const interactionMode = getInteractionMode(currentExercise);
+  const isPinchDefenseExercise = interactionMode === 'pinch_defense';
   const cameraLive = mediaPipe.running;
   const trackingOk = Boolean(mediaPipe.trackedHand.landmarks && !isHandWithdrawn(mediaPipe.trackedHand.bounds));
   const activeZoneLabel = useMemo(
@@ -1239,7 +1278,9 @@ export function RehabWorkspace() {
                     <div className="screen-kicker">Preparation Stage 02</div>
                     <h2 className="hero-title">{currentExercise?.name || 'Loading Exercise'}</h2>
                     <p className="body-copy">
-                      Watch the reference clip first, then use your live camera on the right to start, switch exercise, or open the summary.
+                      {isPinchDefenseExercise
+                        ? 'Review the finger mapping, keep the whole hand visible, then use the live camera on the right to launch the defense runtime.'
+                        : 'Watch the reference clip first, then use your live camera on the right to start, switch exercise, or open the summary.'}
                     </p>
                   </div>
                   <div className="screen-meta">Zone holds follow your own left and right</div>
@@ -1266,7 +1307,7 @@ export function RehabWorkspace() {
                         </div>
                         <div className="hero-metric">
                           <strong>Guide Checkpoints</strong>
-                          <span>{interactionMode === 'pinch_defense' ? 'Runtime' : guideFrames.length || '--'}</span>
+                          <span>{isPinchDefenseExercise ? 'Runtime' : guideFrames.length || '--'}</span>
                         </div>
                       </div>
 
@@ -1289,7 +1330,7 @@ export function RehabWorkspace() {
                         <div className="asset-warning">{apiError}</div>
                       ) : null}
 
-                      {!currentExercise?.video_ready || !currentExercise?.landmarks_ready ? (
+                      {!isPinchDefenseExercise && (!currentExercise?.video_ready || !currentExercise?.landmarks_ready) ? (
                         <div className="asset-warning">
                           {!currentExercise?.video_ready ? 'Reference video is missing. ' : ''}
                           {!currentExercise?.landmarks_ready ? 'Landmark checkpoints are missing for this exercise.' : ''}
@@ -1317,10 +1358,14 @@ export function RehabWorkspace() {
                     </section>
 
                     <div className="instruction-video-shell">
-                      <ReferenceFrame
-                        src={referenceVideoUrl}
-                        emptyMessage="Reference clip unavailable for this exercise."
-                      />
+                      {isPinchDefenseExercise ? (
+                        <PinchDefenseBriefing />
+                      ) : (
+                        <ReferenceFrame
+                          src={referenceVideoUrl}
+                          emptyMessage="Reference clip unavailable for this exercise."
+                        />
+                      )}
                     </div>
 
                     <section className="hero-guidance instruction-guidance">
