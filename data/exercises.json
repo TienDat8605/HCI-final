@@ -10,8 +10,8 @@
       "end": "exercise_1_end.jpg"
     },
     "landmarks_file": "exercise_1.json",
-    "total_landmark_frames": 160,
-    "frames_with_hands": 114,
+    "total_landmark_frames": 80,
+    "frames_with_hands": 57,
     "detection_rate": 71.2
   },
   {
@@ -25,9 +25,9 @@
       "end": "exercise_2_end.jpg"
     },
     "landmarks_file": "exercise_2.json",
-    "total_landmark_frames": 230,
-    "frames_with_hands": 189,
-    "detection_rate": 82.2
+    "total_landmark_frames": 115,
+    "frames_with_hands": 80,
+    "detection_rate": 69.6
   },
   {
     "id": 3,
@@ -40,9 +40,9 @@
       "end": "exercise_3_end.jpg"
     },
     "landmarks_file": "exercise_3.json",
-    "total_landmark_frames": 201,
-    "frames_with_hands": 160,
-    "detection_rate": 79.6
+    "total_landmark_frames": 101,
+    "frames_with_hands": 80,
+    "detection_rate": 79.2
   },
   {
     "id": 4,
@@ -55,8 +55,8 @@
       "end": "exercise_4_end.jpg"
     },
     "landmarks_file": "exercise_4.json",
-    "total_landmark_frames": 260,
-    "frames_with_hands": 218,
+    "total_landmark_frames": 130,
+    "frames_with_hands": 109,
     "detection_rate": 83.8
   },
   {
@@ -70,8 +70,8 @@
       "end": "exercise_5_end.jpg"
     },
     "landmarks_file": "exercise_5.json",
-    "total_landmark_frames": 380,
-    "frames_with_hands": 341,
-    "detection_rate": 89.7
+    "total_landmark_frames": 190,
+    "frames_with_hands": 168,
+    "detection_rate": 88.4
   }
 ]
