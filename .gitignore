@@ -14,3 +14,4 @@ ENV/
 data/landmarks/
 data/keyframes/
 *.log
+.codex

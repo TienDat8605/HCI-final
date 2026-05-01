@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Process the hand exercise reference video:
-1. Split into 5 exercise clips
+1. Split into selected exercise clips
 2. Extract hand landmarks using MediaPipe Tasks API
 3. Save landmark sequences as JSON
 4. Extract representative keyframes
@@ -13,12 +13,10 @@ import os
 import subprocess
 import numpy as np
 
-# Exercise definitions with timestamps (seconds)
+# Exercise definitions with timestamps (seconds).
+# Product scope: only exercise_1 and exercise_5 are active.
 EXERCISES = [
     {"id": 1, "name": "Finger Opposition",  "start": 0,  "end": 16},
-    {"id": 2, "name": "Wrist Movements",    "start": 16, "end": 39},
-    {"id": 3, "name": "Hand Circuit",        "start": 39, "end": 59},
-    {"id": 4, "name": "Stretch",             "start": 59, "end": 85},
     {"id": 5, "name": "Strengthening",       "start": 85, "end": 123},
 ]
 

@@ -19,6 +19,11 @@ LANDMARKS_DIR = os.path.join(DATA_DIR, "landmarks")
 KEYFRAMES_DIR = os.path.join(DATA_DIR, "keyframes")
 EXERCISES_PATH = os.path.join(DATA_DIR, "exercises.json")
 KEYFRAME_POSITIONS = ("start", "mid", "end")
+SUPPORTED_EXERCISE_IDS = (1, 5)
+EXERCISE_GAME_MODES = {
+    1: "exercise_1_mode",
+    5: "exercise_5_mode",
+}
 
 app = Flask(__name__, static_folder=STATIC_DIR)
 
@@ -59,6 +64,7 @@ def enrich_exercise(exercise):
     exercise_id = exercise.get("id")
     return {
         **exercise,
+        "game_mode": EXERCISE_GAME_MODES.get(exercise_id, "unsupported"),
         "video_ready": os.path.exists(exercise_file(CLIPS_DIR, exercise_id, "mp4")),
         "landmarks_ready": os.path.exists(exercise_file(LANDMARKS_DIR, exercise_id, "json")),
         "keyframes_ready": all(
@@ -66,6 +72,10 @@ def enrich_exercise(exercise):
             for position in KEYFRAME_POSITIONS
         ),
     }
+
+
+def is_supported_exercise(exercise_id):
+    return exercise_id in SUPPORTED_EXERCISE_IDS
 
 
 # ── Routes ────────────────────────────────────────────────
@@ -86,11 +96,15 @@ def get_exercises():
         return json_error("exercise metadata not found", 404)
 
     exercises = read_json(EXERCISES_PATH)
-    return jsonify([enrich_exercise(exercise) for exercise in exercises])
+    filtered = [exercise for exercise in exercises if exercise.get("id") in SUPPORTED_EXERCISE_IDS]
+    filtered.sort(key=lambda exercise: exercise.get("id", 0))
+    return jsonify([enrich_exercise(exercise) for exercise in filtered])
 
 
 @app.route("/api/landmarks/<int:exercise_id>")
 def get_landmarks(exercise_id):
+    if not is_supported_exercise(exercise_id):
+        return json_error("not found", 404)
     data = get_ref_data(exercise_id)
     if data is None:
         return json_error("not found", 404)
@@ -99,11 +113,15 @@ def get_landmarks(exercise_id):
 
 @app.route("/api/video/<int:exercise_id>")
 def get_video(exercise_id):
+    if not is_supported_exercise(exercise_id):
+        return json_error("not found", 404)
     return send_exercise_file(CLIPS_DIR, exercise_id, "mp4", "video/mp4")
 
 
 @app.route("/api/keyframe/<int:exercise_id>/<position>")
 def get_keyframe(exercise_id, position):
+    if not is_supported_exercise(exercise_id):
+        return json_error("not found", 404)
     if position not in KEYFRAME_POSITIONS:
         return json_error("invalid position", 400)
     img_path = os.path.join(KEYFRAMES_DIR, f"exercise_{exercise_id}_{position}.jpg")
@@ -118,8 +136,15 @@ def compare():
     exercise_id = data.get("exercise_id")
     user_landmarks = data.get("landmarks", [])
 
-    if not exercise_id or not user_landmarks or len(user_landmarks) != 21:
+    try:
+        exercise_id = int(exercise_id)
+    except (TypeError, ValueError):
         return json_error("invalid data", 400)
+
+    if not user_landmarks or len(user_landmarks) != 21:
+        return json_error("invalid data", 400)
+    if not is_supported_exercise(exercise_id):
+        return json_error("not found", 404)
 
     ref_data = get_ref_data(exercise_id)
     if ref_data is None:

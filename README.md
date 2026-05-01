@@ -2,10 +2,19 @@
 
 This project is a Flask app for comparing a live hand pose against reference exercise motions. It serves a web UI, exercise clips, generated hand landmarks, and keyframes.
 
+Current scope keeps only two exercises:
+- `exercise_1` Finger Opposition
+- `exercise_5` Strengthening
+
+Each exercise is mapped to a gamification mode scaffold:
+- exercise 1 -> `exercise_1_mode`
+- exercise 5 -> `exercise_5_mode`
+
 ## What’s in the repo
 
 - `app.py` starts the Flask server.
 - `static/` contains the browser client.
+- `static/gamification/index.js` contains game mode registry + lifecycle scaffold.
 - `process_video.py` generates the exercise clips, landmark JSON, keyframes, and `data/exercises.json`.
 - `hand_compare.py` contains the pose-comparison logic used by the API.
 - `data/hand_landmarker.task` is the MediaPipe model asset used by `process_video.py`.
@@ -56,3 +65,4 @@ Python packages:
 
 - The server expects the generated assets to exist in `data/clips/`, `data/landmarks/`, `data/keyframes/`, and `data/exercises.json`.
 - If you delete the generated data folders, re-run `process_video.py` after restoring the source video and model asset.
+- Gamification mode behavior is safe to extend incrementally; missing handlers fall back to no-op scaffold logic.
