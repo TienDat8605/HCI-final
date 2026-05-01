@@ -716,116 +716,150 @@ function renderStrengtheningGameScreen() {
     const exercise = getCurrentExercise();
     const training = appState.training;
     const game = (training && training.gameData) ? training.gameData : {
-        markerProgress: 0,
-        cupMl: 0,
-        targetMl: 150,
-        zoneLabel: 'Bad',
-        zoneKey: 'bad',
-        isSqueezing: false,
-        orderProgress: 0,
+        markerProgress  : 0,
+        cupMl           : 0,
+        targetMl        : 250,
+        zoneKey         : 'bad',
+        zoneLabel       : 'Bad',
+        isSqueezing     : false,
+        orderProgress   : 0,
         activeOrderIndex: 0,
+        comboStreak     : 0,
         orders: [
             { icon: '🍊', targetMl: 250, progress: 0, zoneKey: 'bad', zoneLabel: 'Active', status: 'active' },
-            { icon: '🍋', targetMl: 500, progress: 0, zoneKey: 'bad', zoneLabel: 'Wait', status: 'queue' },
+            { icon: '🍋', targetMl: 500, progress: 0, zoneKey: 'bad', zoneLabel: 'Wait',   status: 'queue'  },
         ],
-        resultPopup: { visible: false, zoneKey: 'bad', title: '', detail: '' },
+        resultPopup: { visible: false, zoneKey: 'bad', title: '', detail: '', pts: null, combo: 0 },
     };
+
     const markerPoint = getTimingMarkerPosition(game.markerProgress);
-    const cupPercent = clamp((game.cupMl / Math.max(1, game.targetMl || 150)) * 100, 0, 100);
-    const popup = game.resultPopup || { visible: false, zoneKey: 'bad', title: '', detail: '' };
+    const cupPercent  = clamp((game.cupMl / Math.max(1, game.targetMl)) * 100, 0, 100);
+    const popup       = game.resultPopup || { visible: false, zoneKey: 'bad', title: '', detail: '' };
+    const gameHud     = (training && training.gameHud) ? training.gameHud : FALLBACK_GAME_HUD;
+    const comboStreak = game.comboStreak || 0;
+    const showCombo   = comboStreak >= 2;
+    const comboLabel  = comboStreak >= 3 ? '×1.5 COMBO' : '×1.2 COMBO';
 
     return `
-        <section class="screen training-screen strengthening-game-screen">
-            <div class="strengthening-game-layout">
-                <aside class="juice-side-panel juice-side-panel-left">
-                    <div class="juice-card juice-target-cup-card ${game.isSqueezing ? 'is-dripping' : ''}">
-                        <div class="juice-card-kicker">Target</div>
-                        <div class="juice-target-top">
-                            <h3>Orange</h3>
-                            <div class="juice-fruit">🍊</div>
+        <section class="screen training-screen sg-game-screen">
+            <div class="sg-layout">
+
+                <!-- ── Left panel: cup + orders ─────────────────────────── -->
+                <aside class="sg-side-panel sg-side-panel--left">
+
+                    <div class="sg-card sg-cup-card ${game.isSqueezing ? 'is-dripping' : ''}" id="juiceTargetCard">
+                        <div class="sg-card-kicker">Cup</div>
+                        <div class="sg-cup-wrap">
+                            <div class="sg-cup-body">
+                                <div id="juiceCupFill" class="sg-cup-fill" style="height:${cupPercent}%;"></div>
+                                <div class="sg-cup-shine"></div>
+                            </div>
                         </div>
-                        <div class="juice-drips" aria-hidden="true">
-                            <span></span>
-                            <span></span>
-                            <span></span>
+                        <div id="juiceCupValue" class="sg-cup-value">
+                            ${Math.round(game.cupMl)} / ${game.targetMl} ml
                         </div>
-                        <div class="juice-cup">
-                            <div id="juiceCupFill" class="juice-cup-fill" style="height:${cupPercent}%;"></div>
-                            <div class="juice-cup-outline"></div>
+                        <div class="sg-drips" aria-hidden="true" id="sgDrips">
+                            <span></span><span></span><span></span>
                         </div>
-                        <div id="juiceCupValue" class="juice-cup-value">${Math.round(game.cupMl)} / ${game.targetMl} ml</div>
                     </div>
+
+                    <div class="sg-card">
+                        <div class="sg-card-kicker">Orders</div>
+                        <div class="sg-order-list" id="juiceOrderList">
+                            ${renderJuiceOrders(game.orders, game.activeOrderIndex || 0)}
+                        </div>
+                    </div>
+
                 </aside>
 
-                <section class="strengthening-stage-column">
-                    <div class="training-stage-shell strengthening-stage-shell">
+                <!-- ── Center: camera + timing bar ──────────────────────── -->
+                <section class="sg-center-column">
+
+                    <!-- Camera stage -->
+                    <div class="sg-stage-shell">
                         <div id="cameraMount" class="stage-mount"></div>
-                        <div class="training-overlay">
-                            <div class="training-head">
+                        <div class="sg-stage-overlay">
+                            <div class="sg-stage-header">
                                 <div>
-                                    <div class="training-subtitle">Squeeze Game</div>
-                                    <h2 class="training-title">${exercise ? exercise.name : 'Strengthening'}</h2>
+                                    <div class="sg-subtitle">Squeeze Game</div>
+                                    <h2 class="sg-title">${exercise ? exercise.name : 'Strengthening'}</h2>
                                 </div>
-                                <div class="status-box">
-                                    <strong>Status</strong>
-                                    <span id="trainingCalibrationText">Scanning live hand</span>
-                                    <div class="status-caption">Timing bar active</div>
+                                <div class="sg-status-box">
+                                    <span id="trainingCalibrationText" class="sg-status-text">Scanning live hand</span>
+                                    <div class="sg-status-caption">Timing bar active</div>
                                 </div>
                             </div>
 
-                            <div class="training-game-hud">
-                                <strong id="trainingGameModeTitle">${training ? training.gameModeTitle : 'Game Mode'}</strong>
-                                <div class="training-game-grid">
-                                    <div>
-                                        <span id="trainingGamePrimaryLabel">Score</span>
-                                        <b id="trainingGamePrimaryValue">${training ? training.gameHud.primaryValue : FALLBACK_GAME_HUD.primaryValue}</b>
-                                    </div>
-                                    <div>
-                                        <span id="trainingGameSecondaryLabel">Zone</span>
-                                        <b id="trainingGameSecondaryValue">${training ? training.gameHud.secondaryValue : FALLBACK_GAME_HUD.secondaryValue}</b>
-                                    </div>
+                            <!-- HUD -->
+                            <div class="sg-hud">
+                                <div class="sg-hud-score">
+                                    <span class="sg-hud-label" id="trainingGamePrimaryLabel">${gameHud.primaryLabel}</span>
+                                    <strong class="sg-hud-value" id="trainingGamePrimaryValue">${gameHud.primaryValue}</strong>
                                 </div>
-                                <small id="trainingGameStatusText">${training ? training.gameHud.statusText : FALLBACK_GAME_HUD.statusText}</small>
+                                <div class="sg-hud-divider"></div>
+                                <div class="sg-hud-order">
+                                    <span class="sg-hud-label" id="trainingGameSecondaryLabel">${gameHud.secondaryLabel}</span>
+                                    <strong class="sg-hud-value" id="trainingGameSecondaryValue">${gameHud.secondaryValue}</strong>
+                                </div>
+                                <div class="sg-combo-badge ${showCombo ? 'is-visible' : ''}" id="sgComboBadge">${comboLabel}</div>
                             </div>
+
+                            <div class="sg-stage-footer" id="trainingGameStatusText">${gameHud.statusText}</div>
                         </div>
                     </div>
 
-                    <div class="juice-timing-shell">
-                        <svg class="juice-timing-arc" viewBox="0 0 600 220" preserveAspectRatio="none" aria-hidden="true">
-                            <path d="M66 128 L534 128" pathLength="100" class="juice-arc-base"></path>
-                            <path d="M66 128 L534 128" pathLength="100" class="juice-arc-good-left"></path>
-                            <path d="M66 128 L534 128" pathLength="100" class="juice-arc-excellent"></path>
-                            <path d="M66 128 L534 128" pathLength="100" class="juice-arc-good-right"></path>
-                        </svg>
+                    <!-- Timing bar -->
+                    <div class="sg-timing-shell" id="sgTimingShell">
+
+                        <!-- Zone bands -->
+                        <div class="sg-band sg-band--bad-left"></div>
+                        <div class="sg-band sg-band--good-left"></div>
+                        <div class="sg-band sg-band--excellent">
+                            <span class="sg-band-label">EXCELLENT</span>
+                        </div>
+                        <div class="sg-band sg-band--good-right"></div>
+                        <div class="sg-band sg-band--bad-right"></div>
+
+                        <!-- Marker trail -->
+                        <div class="sg-marker-trail" id="sgMarkerTrail"
+                             style="width:${markerPoint.x}px;"></div>
+
+                        <!-- Marker -->
                         <div
                             id="juiceTimingMarker"
-                            class="juice-timing-marker"
+                            class="sg-marker"
                             data-zone="${game.zoneKey}"
                             style="left:${markerPoint.x}px; top:${markerPoint.y}px;"
                         ></div>
+
+                        <!-- Result popup -->
                         <div
                             id="juiceResultPopup"
-                            class="juice-result-popup ${popup.visible ? 'is-visible' : ''}"
+                            class="sg-result-popup ${popup.visible ? 'is-visible' : ''}"
                             data-zone="${popup.zoneKey || 'bad'}"
                         >
                             <strong id="juiceResultTitle">${popup.title || ''}</strong>
-                            <small id="juiceResultDetail">${popup.detail || ''}</small>
+                            <small  id="juiceResultDetail">${popup.detail || ''}</small>
+                            ${popup.pts != null ? `<div class="sg-result-pts" id="juiceResultPts">+${popup.pts} pts</div>` : '<div id="juiceResultPts"></div>'}
                         </div>
+
+                        <!-- Squeeze state -->
+                        <div class="sg-squeeze-row">
+                            <div id="juiceSqueezeState" class="sg-squeeze-indicator ${game.isSqueezing ? 'is-active' : ''}">
+                                <span class="sg-squeeze-dot"></span>
+                                <span id="sgSqueezeLabel">${game.isSqueezing ? 'Squeezing' : 'Released'}</span>
+                            </div>
+                            <div class="sg-intensity-wrap">
+                                <div class="sg-intensity-track">
+                                    <div class="sg-intensity-fill" id="sgIntFill" style="width:0%;"></div>
+                                </div>
+                                <span class="sg-intensity-label" id="sgIntLabel">0%</span>
+                            </div>
+                        </div>
+
                     </div>
                 </section>
 
-                <aside class="juice-side-panel juice-side-panel-right">
-                    <div class="juice-card">
-                        <div class="juice-card-kicker">Orders</div>
-                        ${renderJuiceOrders(game.orders, game.activeOrderIndex || 0)}
-                    </div>
-                    <div class="juice-card">
-                        <div class="juice-card-kicker">Hand</div>
-                        <div id="juiceSqueezeState" class="juice-squeeze-state ${game.isSqueezing ? 'is-active' : ''}">
-                            ${game.isSqueezing ? 'Squeezing' : 'Released'}
-                        </div>
-                    </div>
-                </aside>
             </div>
         </section>
     `;
@@ -2295,111 +2329,132 @@ function updateTraining(now) {
 }
 
 function updateTrainingUI() {
-    if (appState.screen !== 'training' && appState.screen !== 'paused') {
-        return;
-    }
-
     const training = appState.training;
     if (!training) return;
 
-    const completed = training.guideIndex;
-    const progressPercent = getCompletionPercent(completed);
-
-    const progressFill = dom.screenRoot.querySelector('#trainingProgressFill');
-    const progressPop = dom.screenRoot.querySelector('#trainingProgressPop');
-    const progressMeta = dom.screenRoot.querySelector('#trainingProgressMeta');
-    const calibration = dom.screenRoot.querySelector('#trainingCalibrationText');
-    const cueTitle = dom.screenRoot.querySelector('#trainingCueTitle');
-    const cueText = dom.screenRoot.querySelector('#trainingCueText');
+    // Standard training fields (unchanged from original)
+    const progressFill  = dom.screenRoot.querySelector('#trainingProgressFill');
+    const progressPop   = dom.screenRoot.querySelector('#trainingProgressPop');
+    const progressMeta  = dom.screenRoot.querySelector('#trainingProgressMeta');
+    const calibration   = dom.screenRoot.querySelector('#trainingCalibrationText');
+    const cueTitle      = dom.screenRoot.querySelector('#trainingCueTitle');
+    const cueText       = dom.screenRoot.querySelector('#trainingCueText');
     const gameModeTitle = dom.screenRoot.querySelector('#trainingGameModeTitle');
-    const gamePrimaryLabel = dom.screenRoot.querySelector('#trainingGamePrimaryLabel');
-    const gamePrimaryValue = dom.screenRoot.querySelector('#trainingGamePrimaryValue');
-    const gameSecondaryLabel = dom.screenRoot.querySelector('#trainingGameSecondaryLabel');
-    const gameSecondaryValue = dom.screenRoot.querySelector('#trainingGameSecondaryValue');
-    const gameStatusText = dom.screenRoot.querySelector('#trainingGameStatusText');
-    const juiceMarker = dom.screenRoot.querySelector('#juiceTimingMarker');
-    const juiceCupFill = dom.screenRoot.querySelector('#juiceCupFill');
-    const juiceCupValue = dom.screenRoot.querySelector('#juiceCupValue');
-    const juiceSqueezeState = dom.screenRoot.querySelector('#juiceSqueezeState');
-    const juiceTargetCard = dom.screenRoot.querySelector('.juice-target-cup-card');
-    const juiceOrderRows = Array.from(dom.screenRoot.querySelectorAll('[data-order-index]'));
-    const juiceResultPopup = dom.screenRoot.querySelector('#juiceResultPopup');
-    const juiceResultTitle = dom.screenRoot.querySelector('#juiceResultTitle');
-    const juiceResultDetail = dom.screenRoot.querySelector('#juiceResultDetail');
-    const gameHud = training.gameHud || FALLBACK_GAME_HUD;
-    const gameData = training.gameData || null;
+
+    const progressPercent = getCompletionPercent(training.guideIndex);
+    const gameHud         = training.gameHud || FALLBACK_GAME_HUD;
+    const gameData        = training.gameData || null;
 
     if (progressFill) progressFill.style.height = `${progressPercent}%`;
-    if (progressPop) progressPop.textContent = `${progressPercent}%`;
-    if (progressMeta) progressMeta.textContent = `${progressPercent}% complete`;
-    if (calibration) calibration.textContent = training.calibrationText;
-    if (cueTitle) cueTitle.textContent = training.cueText;
-    if (cueText) cueText.textContent = training.cueDetail;
+    if (progressPop)  progressPop.textContent   = `${progressPercent}%`;
+    if (progressMeta) progressMeta.textContent  = `${progressPercent}% complete`;
+    if (calibration)  calibration.textContent   = training.calibrationText;
+    if (cueTitle)     cueTitle.textContent      = training.cueText;
+    if (cueText)      cueText.textContent       = training.cueDetail;
     if (gameModeTitle) gameModeTitle.textContent = training.gameModeTitle || 'Game Mode';
-    if (gamePrimaryLabel) gamePrimaryLabel.textContent = gameHud.primaryLabel;
-    if (gamePrimaryValue) gamePrimaryValue.textContent = gameHud.primaryValue;
-    if (gameSecondaryLabel) gameSecondaryLabel.textContent = gameHud.secondaryLabel;
-    if (gameSecondaryValue) gameSecondaryValue.textContent = gameHud.secondaryValue;
-    if (gameStatusText) gameStatusText.textContent = gameHud.statusText;
 
-    if (gameData) {
-        const timingShell = dom.screenRoot.querySelector('.juice-timing-shell');
-        const timingWidth = timingShell ? timingShell.clientWidth : 600;
-        const timingHeight = timingShell ? timingShell.clientHeight : 150;
-        const markerPoint = getTimingMarkerPosition(gameData.markerProgress, timingWidth, timingHeight);
-        const targetMl = Math.max(1, gameData.targetMl || 150);
-        const cupPercent = clamp((gameData.cupMl / targetMl) * 100, 0, 100);
+    // HUD score / order label
+    const elPrimaryVal   = dom.screenRoot.querySelector('#trainingGamePrimaryValue');
+    const elSecondaryVal = dom.screenRoot.querySelector('#trainingGameSecondaryValue');
+    const elStatusText   = dom.screenRoot.querySelector('#trainingGameStatusText');
+    if (elPrimaryVal)   elPrimaryVal.textContent   = gameHud.primaryValue;
+    if (elSecondaryVal) elSecondaryVal.textContent = gameHud.secondaryValue;
+    if (elStatusText)   elStatusText.textContent   = gameHud.statusText;
 
-        if (juiceMarker) {
-            juiceMarker.style.left = `${markerPoint.x}px`;
-            juiceMarker.style.top = `${markerPoint.y}px`;
-            juiceMarker.dataset.zone = gameData.zoneKey || 'bad';
-        }
-        if (juiceCupFill) {
-            juiceCupFill.style.height = `${cupPercent}%`;
-        }
-        if (juiceCupValue) {
-            juiceCupValue.textContent = `${Math.round(gameData.cupMl || 0)} / ${targetMl} ml`;
-        }
-        if (juiceOrderRows.length && Array.isArray(gameData.orders)) {
-            juiceOrderRows.forEach((row) => {
-                const index = Number(row.dataset.orderIndex);
-                const order = gameData.orders[index];
-                if (!order) return;
-                const progressElement = row.querySelector('[data-order-progress]');
-                const zoneElement = row.querySelector('[data-order-zone]');
-                const isActive = index === gameData.activeOrderIndex;
-                const isDone = order.status === 'done';
+    if (!gameData) return;
 
-                row.classList.toggle('is-active', isActive);
-                row.classList.toggle('is-muted', !isActive && !isDone);
-                row.classList.toggle('is-done', isDone);
+    // Strengthening-game-specific DOM updates 
 
-                if (progressElement) {
-                    progressElement.textContent = `${Math.round(clamp(order.progress || 0, 0, 1) * 100)}%`;
-                }
-                if (zoneElement) {
-                    zoneElement.textContent = order.zoneLabel || (isActive ? 'Active' : 'Wait');
-                    zoneElement.dataset.zone = order.zoneKey || 'bad';
-                }
-            });
-        }
-        if (juiceSqueezeState) {
-            juiceSqueezeState.textContent = gameData.isSqueezing ? 'Squeezing' : 'Released';
-            juiceSqueezeState.classList.toggle('is-active', Boolean(gameData.isSqueezing));
-        }
-        if (juiceTargetCard) {
-            juiceTargetCard.classList.toggle('is-dripping', Boolean(gameData.isSqueezing));
-        }
-        if (juiceResultPopup && gameData.resultPopup) {
-            juiceResultPopup.classList.toggle('is-visible', Boolean(gameData.resultPopup.visible));
-            juiceResultPopup.dataset.zone = gameData.resultPopup.zoneKey || 'bad';
-            if (juiceResultTitle) {
-                juiceResultTitle.textContent = gameData.resultPopup.title || '';
+    // Timing marker
+    const timingShell = dom.screenRoot.querySelector('#sgTimingShell');
+    const markerEl    = dom.screenRoot.querySelector('#juiceTimingMarker');
+    const trailEl     = dom.screenRoot.querySelector('#sgMarkerTrail');
+
+    if (timingShell && markerEl) {
+        const w   = timingShell.clientWidth  || 600;
+        const h   = timingShell.clientHeight || 80;
+        const pt  = getTimingMarkerPosition(gameData.markerProgress, w, h);
+        markerEl.style.left  = `${pt.x}px`;
+        markerEl.style.top   = `${pt.y}px`;
+        markerEl.dataset.zone = gameData.zoneKey || 'bad';
+        if (trailEl) trailEl.style.width = `${pt.x}px`;
+    }
+
+    // Cup fill
+    const cupFill = dom.screenRoot.querySelector('#juiceCupFill');
+    const cupVal  = dom.screenRoot.querySelector('#juiceCupValue');
+    const targetMl = Math.max(1, gameData.targetMl || 250);
+    const cupPct   = clamp((gameData.cupMl / targetMl) * 100, 0, 100);
+    if (cupFill) cupFill.style.height = `${cupPct}%`;
+    if (cupVal)  cupVal.textContent   = `${Math.round(gameData.cupMl || 0)} / ${targetMl} ml`;
+
+    // Cup card dripping class
+    const cupCard = dom.screenRoot.querySelector('#juiceTargetCard');
+    if (cupCard) cupCard.classList.toggle('is-dripping', Boolean(gameData.isSqueezing));
+
+    // Drip animations
+    const drips = dom.screenRoot.querySelectorAll('#sgDrips span');
+    drips.forEach((d) => d.classList.toggle('active', Boolean(gameData.isSqueezing && !gameData.orderResolved)));
+
+    // Order rows
+    const orderList = dom.screenRoot.querySelector('#juiceOrderList');
+    if (orderList && Array.isArray(gameData.orders)) {
+        orderList.querySelectorAll('[data-order-index]').forEach((row) => {
+            const index    = Number(row.dataset.orderIndex);
+            const order    = gameData.orders[index];
+            if (!order) return;
+            const isActive = index === gameData.activeOrderIndex;
+            const isDone   = order.status === 'done';
+            row.classList.toggle('is-active', isActive);
+            row.classList.toggle('is-muted',  !isActive && !isDone);
+            row.classList.toggle('is-done',    isDone);
+            const progEl = row.querySelector('[data-order-progress]');
+            const zoneEl = row.querySelector('[data-order-zone]');
+            if (progEl) progEl.textContent = `${Math.round(clamp(order.progress || 0, 0, 1) * 100)}%`;
+            if (zoneEl) {
+                zoneEl.textContent    = order.zoneLabel || (isActive ? 'Active' : 'Wait');
+                zoneEl.dataset.zone   = order.zoneKey || 'bad';
             }
-            if (juiceResultDetail) {
-                juiceResultDetail.textContent = gameData.resultPopup.detail || '';
-            }
+        });
+    }
+
+    // Squeeze indicator
+    const squeezeEl    = dom.screenRoot.querySelector('#juiceSqueezeState');
+    const squeezeLbl   = dom.screenRoot.querySelector('#sgSqueezeLabel');
+    const intFill      = dom.screenRoot.querySelector('#sgIntFill');
+    const intLabel     = dom.screenRoot.querySelector('#sgIntLabel');
+    const isSqueezing  = Boolean(gameData.isSqueezing);
+    const intPct       = Math.round(clamp((gameData.squeezeIntensity || 0) * 100, 0, 100));
+
+    if (squeezeEl) squeezeEl.classList.toggle('is-active', isSqueezing);
+    if (squeezeLbl) squeezeLbl.textContent = isSqueezing ? `Squeezing… ${intPct}%` : 'Released';
+    if (intFill)   intFill.style.width  = `${intPct}%`;
+    if (intLabel)  intLabel.textContent = `${intPct}%`;
+
+    // Combo badge
+    const comboBadge  = dom.screenRoot.querySelector('#sgComboBadge');
+    const comboStreak = gameData.comboStreak || 0;
+    if (comboBadge) {
+        const showCombo  = comboStreak >= 2;
+        const comboLabel = comboStreak >= 3 ? '×1.5 COMBO' : '×1.2 COMBO';
+        comboBadge.classList.toggle('is-visible', showCombo);
+        comboBadge.textContent = comboLabel;
+    }
+
+    // Result popup
+    const popup       = dom.screenRoot.querySelector('#juiceResultPopup');
+    const popupTitle  = dom.screenRoot.querySelector('#juiceResultTitle');
+    const popupDetail = dom.screenRoot.querySelector('#juiceResultDetail');
+    const popupPts    = dom.screenRoot.querySelector('#juiceResultPts');
+    if (popup && gameData.resultPopup) {
+        popup.classList.toggle('is-visible', Boolean(gameData.resultPopup.visible));
+        popup.dataset.zone = gameData.resultPopup.zoneKey || 'bad';
+        if (popupTitle)  popupTitle.textContent  = gameData.resultPopup.title  || '';
+        if (popupDetail) popupDetail.textContent = gameData.resultPopup.detail || '';
+        if (popupPts) {
+            popupPts.textContent = gameData.resultPopup.pts != null
+                ? `+${gameData.resultPopup.pts} pts`
+                : '';
         }
     }
 }
