@@ -163,7 +163,79 @@ function isPinchDefenseExercise(exercise = getCurrentExercise()) {
     return getExerciseInteractionMode(exercise) === 'pinch_defense';
 }
 
+function createModeAdapter(mode, exercise) {
+    let state = null;
+    let lastTime = performance.now();
+
+    return {
+        modeId: mode.id,
+        modeTitle: mode.title,
+
+        notifySessionStart(payload) {
+            state = mode.createInitialState();
+
+            const result = mode.onSessionStart(state, payload);
+            if (result && typeof result.then === 'function') {
+                result.catch((err) => {
+                    console.error(`[gamification] ${mode.id}.onSessionStart async failed`, err);
+                });
+            }
+        },
+
+        notifyFrame() {
+            if (!state) return;
+
+            const now = performance.now();
+            const deltaSeconds = (now - lastTime) / 1000;
+            lastTime = now;
+
+            mode.onFrame(state, {
+                deltaSeconds,
+                now,
+                liveLandmarks: appState.latestLandmarks,
+            });
+        },
+
+        notifyPause(payload) {
+            mode.onPause?.(state, payload);
+        },
+
+        notifyResume(payload) {
+            mode.onResume?.(state, payload);
+        },
+
+        notifySessionEnd(payload) {
+            mode.onSessionEnd?.(state, payload);
+        },
+
+        mount(container) {
+            if (mode.renderer && typeof mode.renderer.mount === 'function') {
+                mode.renderer.mount(container);
+            }
+        },
+
+        unmount() {
+            if (mode.renderer && typeof mode.renderer.unmount === 'function') {
+                mode.renderer.unmount();
+            }
+        },
+
+        snapshot() {
+            return {
+                hud: state?.hud,
+                summary: state?.summary,
+                viewState: state?.gameData,
+            };
+        },
+    };
+}
+
 function createGameRuntime(exercise) {
+    const modes = window.BlueprintGamificationModes;
+
+    if (modes && modes.exercise_5_mode && exercise?.id === 5) {
+        return createModeAdapter(modes.exercise_5_mode, exercise);
+    }
     if (!exercise) {
         return createFallbackGameRuntime(null);
     }
@@ -666,6 +738,7 @@ function renderTrainingScreen() {
                 <section>
                     <div class="training-stage-shell">
                         <div id="cameraMount" class="stage-mount"></div>
+                        <div id="gameMount" class="game-mount"></div>
                         <div class="training-overlay">
                             <div class="training-head">
                                 <div>
@@ -2137,6 +2210,7 @@ function updateTraining(now) {
         training.gameRuntime.notifyFrame({
             now,
             deltaSeconds,
+            liveLandmarks: appState.latestLandmarks,
             guideIndex: training.guideIndex,
             completionPercent: getCompletionPercent(training.guideIndex),
             holdProgress: training.holdProgress,

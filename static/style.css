@@ -537,6 +537,12 @@ button {
 }
 
 .stage-mount {
+    height: 100%;
+    position: absolute;
+    inset: 0;
+}
+
+.game-mount {
     position: absolute;
     inset: 0;
 }

@@ -88,11 +88,16 @@
 
         function callSafe(handlerName, payload) {
             try {
-                mode[handlerName](state, payload);
+                const result = mode[handlerName](state, payload);
+                if (result && typeof result.then === 'function') {
+                    result.catch((error) => {
+                        console.error(`[gamification] ${mode.id}.${handlerName} async failed`, error);
+                    });
+                }
             } catch (error) {
                 console.error(`[gamification] ${mode.id}.${handlerName} failed`, error);
-            }
         }
+    }
 
         return {
             modeId: mode.id,
