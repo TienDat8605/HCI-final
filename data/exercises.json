@@ -11,8 +11,8 @@
       "end": "exercise_1_end.jpg"
     },
     "landmarks_file": "exercise_1.json",
-    "total_landmark_frames": 160,
-    "frames_with_hands": 114,
+    "total_landmark_frames": 80,
+    "frames_with_hands": 57,
     "detection_rate": 71.2
   },
   {
@@ -27,9 +27,9 @@
       "end": "exercise_5_end.jpg"
     },
     "landmarks_file": "exercise_5.json",
-    "total_landmark_frames": 380,
-    "frames_with_hands": 341,
-    "detection_rate": 89.7
+    "total_landmark_frames": 190,
+    "frames_with_hands": 169,
+    "detection_rate": 88.9
   },
   {
     "id": 6,

@@ -143,6 +143,7 @@
                     modeDescription: mode.description,
                     hud: state.hud || createDefaultHud(),
                     summary: state.summary || null,
+                    gameData: state.gameData || null,
                     viewState: state.viewState || null,
                 };
             },
