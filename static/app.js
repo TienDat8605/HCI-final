@@ -56,7 +56,7 @@ const EXERCISE_COPY = {
 
 const ZONE_HOLD_MS = 2500;
 const MATCH_HOLD_MS = 450;
-const PAUSE_HAND_LOSS_MS = 900;
+const PAUSE_HAND_LOSS_MS = 2000;
 const PINCH_DEFENSE_PAUSE_MS = 800;
 const SCORE_SAMPLE_MS = 180;
 const PROGRESS_MATCH_THRESHOLD = 40;
@@ -84,6 +84,7 @@ const FALLBACK_GAME_HUD = {
     secondaryValue: 'Follow guide checkpoints',
     statusText: 'Gamification scaffold active',
 };
+const DEV_AUTOSTART_GAME_MODE = true;
 
 const appState = {
     exercises: [],
@@ -260,6 +261,7 @@ function syncTrainingGameSnapshot(training) {
     training.gameModeTitle = snapshot.modeTitle || training.gameModeTitle || 'Unknown Mode';
     training.gameHud = { ...FALLBACK_GAME_HUD, ...(snapshot.hud || {}) };
     training.gameSummary = snapshot.summary || null;
+    training.gameData = snapshot.gameData || null;
     training.gameViewState = snapshot.viewState || null;
 }
 
@@ -382,6 +384,12 @@ function updateShell() {
 
 function getScreenZoneConfig() {
     const hasAnySummary = Boolean(appState.training || appState.currentSummary || appState.lastSessionSummary);
+    const isLeaderboardPause = Boolean(
+        appState.screen === 'paused'
+        && appState.training
+        && appState.training.pauseReason === 'leaderboard'
+        && appState.training.sessionMode === 'game'
+    );
     const currentExercise = getCurrentExercise();
     const canStartInstructions = currentExercise
         ? (isPinchDefenseExercise(currentExercise) || Boolean(appState.referenceData && appState.guideFrames.length))
@@ -403,6 +411,14 @@ function getScreenZoneConfig() {
                 right: { enabled: appState.exercises.length > 1, label: 'Next', description: 'Hold on your right side to switch to the next exercise.' },
             };
         case 'paused':
+            if (isLeaderboardPause) {
+                return {
+                    top: { enabled: true, label: 'Return', description: 'Exit leaderboard and go back to instructions.' },
+                    left: { enabled: appState.exercises.length > 1, label: 'Prev Mode', description: 'Switch to previous game mode.' },
+                    center: { enabled: true, label: 'Play Again', description: 'Restart this game mode now.' },
+                    right: { enabled: appState.exercises.length > 1, label: 'Next Mode', description: 'Switch to next game mode.' },
+                };
+            }
             return {
                 top: { enabled: hasAnySummary, label: 'Summary', description: 'Review the current session summary.' },
                 left: { enabled: appState.exercises.length > 1, label: 'Previous', description: 'Leave pause and open the previous exercise instructions.' },
@@ -496,26 +512,26 @@ function refreshCameraStage() {
 function renderBootScreen() {
     return `
         <section class="screen boot-screen">
+            <div class="boot-backdrop" aria-hidden="true"></div>
             <div class="boot-card">
-                <div class="screen-kicker">Blueprint Recovery Flow</div>
-                <h2>Camera-Led Hand Training</h2>
+                <div class="screen-kicker">Hand Rehabilitation</div>
+                <h2>Recover your <span>hand</span></h2>
                 <p>
-                    This version replaces the old split-screen workflow with a staged experience:
-                    hand-position zones, a reference instruction view, full-screen live coaching with landmark guidance,
-                    automatic pause when the hand leaves the frame, and a session summary at the end.
+                    Begin with camera guidance in a calmer rehab setting. The system tracks your hand in real time,
+                    shows the reference exercise when needed, and keeps the recovery flow simple to follow.
                 </p>
                 <div class="boot-grid">
                     <div class="boot-stat">
-                        <strong>Navigation</strong>
-                        <span>Hold in zone for 2.5s</span>
+                        <strong>Camera Guided</strong>
+                        <span>Hands-free session flow</span>
                     </div>
                     <div class="boot-stat">
-                        <strong>Training</strong>
-                        <span>Single live camera view</span>
+                        <strong>Live Tracking</strong>
+                        <span>Landmarks respond in real time</span>
                     </div>
                     <div class="boot-stat">
-                        <strong>Guidance</strong>
-                        <span>Reference clip + live landmarks</span>
+                        <strong>Reference Support</strong>
+                        <span>Exercise cues stay close by</span>
                     </div>
                 </div>
                 <div class="button-row">
@@ -595,6 +611,7 @@ function renderInstructionScreen() {
     const isPinchDefense = isPinchDefenseExercise(exercise);
     const hasGuidance = Boolean(appState.referenceData && appState.guideFrames.length);
     const hasVideo = Boolean(exercise && exercise.video_ready);
+    const gameModeAvailable = Boolean(exercise && exercise.id === 5 && hasGuidance);
     const showWarning = exercise && (!exercise.landmarks_ready || !exercise.video_ready);
     const zoneConfig = getScreenZoneConfig();
 
@@ -651,7 +668,10 @@ function renderInstructionScreen() {
                             <button class="button button-secondary" type="button" data-action="prev-exercise">Previous</button>
                             <button class="button button-secondary" type="button" data-action="next-exercise">Next</button>
                             <button class="button button-primary" type="button" data-action="start-training" data-zone-card="center" ${hasGuidance ? '' : 'disabled'}>
-                                Hold Center To Start
+                                Start Normal Mode
+                            </button>
+                            <button class="button button-secondary" type="button" data-action="start-game-mode" ${gameModeAvailable ? '' : 'disabled'}>
+                                Start Game Mode
                             </button>
                         </div>
                     </section>
@@ -705,8 +725,9 @@ function renderTrainingScreen() {
     const training = appState.training;
     const progressPercent = training ? getTrainingProgressPercent(training) : 0;
     const currentCue = training ? training.cueText : 'Match the next pose.';
-    const gameModeTitle = training ? training.gameModeTitle : 'Mode';
-    const gameHud = training ? training.gameHud : FALLBACK_GAME_HUD;
+    const showGameHud = Boolean(training && training.sessionMode === 'game');
+    const gameModeTitle = showGameHud ? training.gameModeTitle : 'Mode';
+    const gameHud = showGameHud ? training.gameHud : FALLBACK_GAME_HUD;
     const isPinchDefense = training && training.interactionMode === 'pinch_defense';
 
     if (isPinchDefense) {
@@ -758,25 +779,223 @@ function renderTrainingScreen() {
                                 <span id="trainingCueText">Watch the instruction clip first, then use the live cue to refine the weakest finger or wrist position.</span>
                             </div>
 
-                            <div class="training-game-hud">
-                                <strong id="trainingGameModeTitle">${gameModeTitle}</strong>
-                                <div class="training-game-grid">
-                                    <div>
-                                        <span id="trainingGamePrimaryLabel">${gameHud.primaryLabel}</span>
-                                        <b id="trainingGamePrimaryValue">${gameHud.primaryValue}</b>
+                            ${showGameHud ? `
+                                <div class="training-game-hud">
+                                    <strong id="trainingGameModeTitle">${gameModeTitle}</strong>
+                                    <div class="training-game-grid">
+                                        <div>
+                                            <span id="trainingGamePrimaryLabel">${gameHud.primaryLabel}</span>
+                                            <b id="trainingGamePrimaryValue">${gameHud.primaryValue}</b>
+                                        </div>
+                                        <div>
+                                            <span id="trainingGameSecondaryLabel">${gameHud.secondaryLabel}</span>
+                                            <b id="trainingGameSecondaryValue">${gameHud.secondaryValue}</b>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <span id="trainingGameSecondaryLabel">${gameHud.secondaryLabel}</span>
-                                        <b id="trainingGameSecondaryValue">${gameHud.secondaryValue}</b>
-                                    </div>
+                                    <small id="trainingGameStatusText">${gameHud.statusText}</small>
                                 </div>
-                                <small id="trainingGameStatusText">${gameHud.statusText}</small>
-                            </div>
+                            ` : ''}
 
                             <div class="training-edge-note">Withdraw hand to pause session</div>
                         </div>
                     </div>
                 </section>
+            </div>
+        </section>
+    `;
+}
+
+function getTimingMarkerPosition(progress, timingWidth = 600, timingHeight = 150) {
+    const clamped = clamp(progress || 0, 0, 1);
+    const startX = timingWidth * 0.11;
+    const endX = timingWidth * 0.89;
+    const y = timingHeight * 0.58;
+    const x = startX + (endX - startX) * clamped;
+    return { x, y };
+}
+
+function renderJuiceOrders(orders, activeOrderIndex) {
+    if (!Array.isArray(orders) || !orders.length) {
+        return `
+            <div class="juice-order-row">
+                <div class="juice-order-icon" aria-hidden="true">🍊</div>
+                <div class="juice-order-info">
+                    <strong>250ml</strong>
+                    <small>0%</small>
+                </div>
+                <span class="juice-zone-badge" data-zone="bad">Wait</span>
+            </div>
+        `;
+    }
+
+    return orders.map((order, index) => {
+        const zoneKey = order.zoneKey || 'bad';
+        const zoneLabel = order.zoneLabel || (index === activeOrderIndex ? 'Active' : 'Wait');
+        const progressPercent = `${Math.round(clamp(order.progress || 0, 0, 1) * 100)}%`;
+        const stateClass = order.status === 'done'
+            ? 'is-done'
+            : (index === activeOrderIndex ? 'is-active' : 'is-muted');
+        return `
+            <div class="juice-order-row ${stateClass}" data-order-index="${index}">
+                <div class="juice-order-icon" aria-hidden="true">${order.icon || '🍊'}</div>
+                <div class="juice-order-info">
+                    <strong>${order.targetMl || 250}ml</strong>
+                    <small data-order-progress>${progressPercent}</small>
+                </div>
+                <span class="juice-zone-badge" data-order-zone data-zone="${zoneKey}">${zoneLabel}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderStrengtheningGameScreen() {
+    const exercise = getCurrentExercise();
+    const training = appState.training;
+    const game = (training && training.gameData) ? training.gameData : {
+        markerProgress  : 0,
+        cupMl           : 0,
+        targetMl        : 250,
+        zoneKey         : 'bad',
+        zoneLabel       : 'Bad',
+        isSqueezing     : false,
+        orderProgress   : 0,
+        activeOrderIndex: 0,
+        comboStreak     : 0,
+        orders: [
+            { icon: '🍊', targetMl: 250, progress: 0, zoneKey: 'bad', zoneLabel: 'Active', status: 'active' },
+            { icon: '🍋', targetMl: 500, progress: 0, zoneKey: 'bad', zoneLabel: 'Wait',   status: 'queue'  },
+        ],
+        resultPopup: { visible: false, zoneKey: 'bad', title: '', detail: '', pts: null, combo: 0 },
+    };
+
+    const markerPoint = getTimingMarkerPosition(game.markerProgress);
+    const cupPercent  = clamp((game.cupMl / Math.max(1, game.targetMl)) * 100, 0, 100);
+    const popup       = game.resultPopup || { visible: false, zoneKey: 'bad', title: '', detail: '' };
+    const gameHud     = (training && training.gameHud) ? training.gameHud : FALLBACK_GAME_HUD;
+    const comboStreak = game.comboStreak || 0;
+    const showCombo   = comboStreak >= 2;
+    const comboLabel  = comboStreak >= 3 ? '×1.5 COMBO' : '×1.2 COMBO';
+
+    return `
+        <section class="screen training-screen sg-game-screen">
+            <div class="sg-layout">
+
+                <!-- ── Left panel: cup + orders ─────────────────────────── -->
+                <aside class="sg-side-panel sg-side-panel--left">
+
+                    <div class="sg-card sg-cup-card ${game.isSqueezing ? 'is-dripping' : ''}" id="juiceTargetCard">
+                        <div class="sg-card-kicker">Cup</div>
+                        <div class="sg-cup-wrap">
+                            <div class="sg-cup-body">
+                                <div id="juiceCupFill" class="sg-cup-fill" style="height:${cupPercent}%;"></div>
+                                <div class="sg-cup-shine"></div>
+                            </div>
+                        </div>
+                        <div id="juiceCupValue" class="sg-cup-value">
+                            ${Math.round(game.cupMl)} / ${game.targetMl} ml
+                        </div>
+                        <div class="sg-drips" aria-hidden="true" id="sgDrips">
+                            <span></span><span></span><span></span>
+                        </div>
+                    </div>
+
+                    <div class="sg-card">
+                        <div class="sg-card-kicker">Orders</div>
+                        <div class="sg-order-list" id="juiceOrderList">
+                            ${renderJuiceOrders(game.orders, game.activeOrderIndex || 0)}
+                        </div>
+                    </div>
+
+                </aside>
+
+                <!-- ── Center: camera + timing bar ──────────────────────── -->
+                <section class="sg-center-column">
+
+                    <!-- Camera stage -->
+                    <div class="sg-stage-shell">
+                        <div id="cameraMount" class="stage-mount"></div>
+                        <div class="sg-stage-overlay">
+                            <div class="sg-stage-header">
+                                <div>
+                                    <div class="sg-subtitle">Squeeze Game</div>
+                                    <h2 class="sg-title">${exercise ? exercise.name : 'Strengthening'}</h2>
+                                </div>
+                                <div class="sg-status-box">
+                                    <span id="trainingCalibrationText" class="sg-status-text">Scanning live hand</span>
+                                    <div class="sg-status-caption">Timing bar active</div>
+                                </div>
+                            </div>
+
+                            <!-- HUD -->
+                            <div class="sg-hud">
+                                <div class="sg-hud-score">
+                                    <span class="sg-hud-label" id="trainingGamePrimaryLabel">${gameHud.primaryLabel}</span>
+                                    <strong class="sg-hud-value" id="trainingGamePrimaryValue">${gameHud.primaryValue}</strong>
+                                </div>
+                                <div class="sg-hud-divider"></div>
+                                <div class="sg-hud-order">
+                                    <span class="sg-hud-label" id="trainingGameSecondaryLabel">${gameHud.secondaryLabel}</span>
+                                    <strong class="sg-hud-value" id="trainingGameSecondaryValue">${gameHud.secondaryValue}</strong>
+                                </div>
+                                <div class="sg-combo-badge ${showCombo ? 'is-visible' : ''}" id="sgComboBadge">${comboLabel}</div>
+                            </div>
+
+                            <div class="sg-stage-footer" id="trainingGameStatusText">${gameHud.statusText}</div>
+                        </div>
+                    </div>
+
+                    <!-- Timing bar -->
+                    <div class="sg-timing-shell" id="sgTimingShell">
+
+                        <!-- Zone bands -->
+                        <div class="sg-band sg-band--bad-left"></div>
+                        <div class="sg-band sg-band--good-left"></div>
+                        <div class="sg-band sg-band--excellent">
+                            <span class="sg-band-label">EXCELLENT</span>
+                        </div>
+                        <div class="sg-band sg-band--good-right"></div>
+                        <div class="sg-band sg-band--bad-right"></div>
+
+                        <!-- Marker trail -->
+                        <div class="sg-marker-trail" id="sgMarkerTrail"
+                             style="width:${markerPoint.x}px;"></div>
+
+                        <!-- Marker -->
+                        <div
+                            id="juiceTimingMarker"
+                            class="sg-marker"
+                            data-zone="${game.zoneKey}"
+                            style="left:${markerPoint.x}px; top:${markerPoint.y}px;"
+                        ></div>
+
+                        <!-- Result popup -->
+                        <div
+                            id="juiceResultPopup"
+                            class="sg-result-popup ${popup.visible ? 'is-visible' : ''}"
+                            data-zone="${popup.zoneKey || 'bad'}"
+                        >
+                            <strong id="juiceResultTitle">${popup.title || ''}</strong>
+                            <small  id="juiceResultDetail">${popup.detail || ''}</small>
+                            ${popup.pts != null ? `<div class="sg-result-pts" id="juiceResultPts">+${popup.pts} pts</div>` : '<div id="juiceResultPts"></div>'}
+                        </div>
+
+                        <!-- Squeeze state -->
+                        <div class="sg-squeeze-row">
+                            <div id="juiceSqueezeState" class="sg-squeeze-indicator ${game.isSqueezing ? 'is-active' : ''}">
+                                <span class="sg-squeeze-dot"></span>
+                                <span id="sgSqueezeLabel">${game.isSqueezing ? 'Squeezing' : 'Released'}</span>
+                            </div>
+                            <div class="sg-intensity-wrap">
+                                <div class="sg-intensity-track">
+                                    <div class="sg-intensity-fill" id="sgIntFill" style="width:0%;"></div>
+                                </div>
+                                <span class="sg-intensity-label" id="sgIntLabel">0%</span>
+                            </div>
+                        </div>
+
+                    </div>
+                </section>
+
             </div>
         </section>
     `;
@@ -788,6 +1007,54 @@ function renderPausedScreen() {
     const latestScore = getTrainingAccuracy(training);
     const exercise = getCurrentExercise();
     const hasVideo = Boolean(exercise && exercise.video_ready);
+    const isLeaderboardPause = Boolean(training && training.pauseReason === 'leaderboard' && training.sessionMode === 'game');
+    const gameData = training ? training.gameData : null;
+    const leaderboard = gameData && Array.isArray(gameData.leaderboard) ? gameData.leaderboard : [];
+    const modeScore = training && training.gameHud ? training.gameHud.primaryValue : '0';
+
+    if (isLeaderboardPause) {
+        return `
+            <section class="screen paused-shell">
+                <div class="paused-header">
+                    <div>
+                        <div class="screen-kicker" style="color: var(--secondary);">Orders Completed</div>
+                        <h2 class="paused-title">Leaderboard</h2>
+                    </div>
+                    <div class="screen-meta">Total Score ${modeScore}</div>
+                </div>
+
+                <div class="paused-content">
+                    <div class="paused-stage-shell">
+                        <div id="cameraMount" class="stage-mount"></div>
+                        <div class="paused-overlay">
+                            ${zoneMarkup(getScreenZoneConfig(), 'paused-center-card')}
+                        </div>
+
+                        <div class="paused-float-card paused-leaderboard-card">
+                            <strong>Session Result</strong>
+                            <div class="paused-metric">
+                                <span>Total Point</span>
+                                <b>${modeScore}</b>
+                            </div>
+                            <div class="leaderboard-list">
+                                ${leaderboard.map((entry) => `
+                                    <div class="leaderboard-row ${entry.isPlayer ? 'is-player' : ''}">
+                                        <span>#${entry.rank}</span>
+                                        <span>${entry.name}</span>
+                                        <b>${entry.score}</b>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <div class="button-row" style="margin-top: 12px;">
+                                <button class="button button-primary" type="button" data-action="play-game-again">Play Again</button>
+                                <button class="button button-secondary" type="button" data-action="return-menu">Return</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        `;
+    }
     const isPinchDefense = training && training.interactionMode === 'pinch_defense';
 
     if (isPinchDefense) {
@@ -977,6 +1244,7 @@ function renderSummaryScreen() {
 
 function render() {
     updateShell();
+    document.body.classList.toggle('boot-mode', appState.screen === 'boot');
 
     let html = '';
     switch (appState.screen) {
@@ -987,7 +1255,12 @@ function render() {
             html = renderInstructionScreen();
             break;
         case 'training':
-            html = renderTrainingScreen();
+            html = appState.training
+                && appState.training.sessionMode === 'game'
+                && getCurrentExercise()
+                && getCurrentExercise().id === 5
+                ? renderStrengtheningGameScreen()
+                : renderTrainingScreen();
             break;
         case 'paused':
             html = renderPausedScreen();
@@ -1033,7 +1306,10 @@ async function handleAction(action) {
             setScreen('instructions');
             break;
         case 'start-training':
-            startTrainingSession();
+            startTrainingSession('normal');
+            break;
+        case 'start-game-mode':
+            startTrainingSession('game');
             break;
         case 'prev-exercise':
             await shiftExercise(-1, true);
@@ -1044,11 +1320,15 @@ async function handleAction(action) {
         case 'resume-training':
             resumeTraining();
             break;
+        case 'play-game-again':
+            startTrainingSession('game');
+            break;
         case 'open-summary':
             openSummary(true);
             break;
         case 'return-menu':
             appState.currentSummary = null;
+            appState.training = null;
             setScreen('instructions');
             break;
         default:
@@ -1187,7 +1467,7 @@ function buildGuideFrames(referenceData) {
     }));
 }
 
-function startTrainingSession() {
+function startTrainingSession(sessionMode = 'normal') {
     const exercise = getCurrentExercise();
     const interactionMode = getExerciseInteractionMode(exercise);
 
@@ -1196,11 +1476,13 @@ function startTrainingSession() {
         return;
     }
 
-    const gameRuntime = createGameRuntime(exercise);
+    const useGameMode = interactionMode === 'pinch_defense' || (sessionMode === 'game' && exercise && exercise.id === 5);
+    const gameRuntime = useGameMode ? createGameRuntime(exercise) : null;
     const sessionStartedAt = performance.now();
     appState.training = {
         interactionMode,
         exerciseId: exercise.id,
+        sessionMode: useGameMode ? 'game' : 'normal',
         activeStartedAt: sessionStartedAt,
         activeElapsedMs: 0,
         pauseCount: 0,
@@ -1222,25 +1504,29 @@ function startTrainingSession() {
         cueDetail: 'Once the live score is high enough, hold briefly to confirm the checkpoint.',
         calibrationText: 'Scanning live hand',
         handLossStartedAt: 0,
+        pauseReason: null,
         fingerTotals: { Thumb: 0, Index: 0, Middle: 0, Ring: 0, Pinky: 0 },
         fingerSamples: 0,
         gameRuntime,
-        gameModeId: gameRuntime.modeId,
-        gameModeTitle: gameRuntime.modeTitle,
+        gameModeId: gameRuntime ? gameRuntime.modeId : null,
+        gameModeTitle: gameRuntime ? gameRuntime.modeTitle : null,
         gameHud: { ...FALLBACK_GAME_HUD },
         gameSummary: null,
+        gameData: null,
         gameViewState: null,
         lastFrameAt: sessionStartedAt,
     };
-    appState.training.gameRuntime.notifySessionStart({
-        exerciseId: exercise.id,
-        exerciseName: exercise.name,
-        guideCount: getGuideCount(),
-        sessionDurationMs: (exercise.session_duration_seconds || exercise.duration) * 1000,
-        interactionMode,
-        handedness: appState.latestHandedness,
-    });
-    syncTrainingGameSnapshot(appState.training);
+    if (appState.training.gameRuntime && typeof appState.training.gameRuntime.notifySessionStart === 'function') {
+        appState.training.gameRuntime.notifySessionStart({
+            exerciseId: exercise.id,
+            exerciseName: exercise.name,
+            guideCount: getGuideCount(),
+            sessionDurationMs: (exercise.session_duration_seconds || exercise.duration) * 1000,
+            interactionMode,
+            handedness: appState.latestHandedness,
+        });
+        syncTrainingGameSnapshot(appState.training);
+    }
 
     if (interactionMode === 'pinch_defense') {
         appState.training.cueText = 'Defend the lane with clean pinches.';
@@ -1259,6 +1545,7 @@ function resumeTraining() {
 
     appState.training.activeStartedAt = performance.now();
     appState.training.handLossStartedAt = 0;
+    appState.training.pauseReason = null;
     appState.training.lastFrameAt = performance.now();
     if (appState.training.gameRuntime && typeof appState.training.gameRuntime.notifyResume === 'function') {
         appState.training.gameRuntime.notifyResume({
@@ -1281,10 +1568,13 @@ function stopTrainingTimer() {
     appState.training.activeElapsedMs += performance.now() - appState.training.activeStartedAt;
 }
 
-function pauseTraining() {
+function pauseTraining(reason = 'hand_lost') {
     if (!appState.training || appState.screen !== 'training') return;
     stopTrainingTimer();
-    appState.training.pauseCount += 1;
+    if (reason !== 'leaderboard') {
+        appState.training.pauseCount += 1;
+    }
+    appState.training.pauseReason = reason;
     appState.training.matchStartedAt = 0;
     appState.training.matchGuideIndex = null;
     appState.training.softMatchStartedAt = 0;
@@ -1461,7 +1751,11 @@ function mountPersistentMedia() {
     if (shouldMountCamera) {
         cameraMount.appendChild(dom.cameraStage);
         dom.cameraStage.classList.remove('is-hidden');
-        dom.cameraStage.dataset.mode = appState.screen === 'paused' ? 'paused' : appState.screen;
+        dom.cameraStage.dataset.mode = appState.screen === 'paused'
+            ? 'paused'
+            : (appState.screen === 'training' && appState.training && appState.training.sessionMode === 'game'
+                ? 'game'
+                : appState.screen);
         refreshCameraStage();
     }
 
@@ -1699,6 +1993,16 @@ function updateZoneDetection(now) {
     }
 }
 
+function navigateGameMode(direction) {
+    shiftExercise(direction, true).then(() => {
+        if (appState.referenceData && appState.guideFrames.length) {
+            startTrainingSession('game');
+        } else {
+            showToast('Selected mode is not ready. Missing guide data.');
+        }
+    });
+}
+
 function handleZoneAction(zoneName) {
     switch (appState.screen) {
         case 'zones':
@@ -1717,13 +2021,28 @@ function handleZoneAction(zoneName) {
             } else if (zoneName === 'right') {
                 shiftExercise(1, true);
             } else if (zoneName === 'center') {
-                startTrainingSession();
+                startTrainingSession('normal');
             } else if (zoneName === 'top' && appState.lastSessionSummary) {
                 appState.currentSummary = appState.lastSessionSummary;
                 setScreen('summary');
             }
             break;
         case 'paused':
+            if (appState.training && appState.training.pauseReason === 'leaderboard' && appState.training.sessionMode === 'game') {
+                if (zoneName === 'left') {
+                    navigateGameMode(-1);
+                } else if (zoneName === 'right') {
+                    navigateGameMode(1);
+                } else if (zoneName === 'center') {
+                    startTrainingSession('game');
+                } else if (zoneName === 'top') {
+                    appState.training = null;
+                    appState.currentSummary = null;
+                    setScreen('instructions');
+                }
+                break;
+            }
+
             if (zoneName === 'left') {
                 shiftExercise(-1, true);
             } else if (zoneName === 'right') {
@@ -2079,6 +2398,7 @@ function updatePinchDefenseTraining(now) {
 function updateTraining(now) {
     const training = appState.training;
     if (!training) return;
+    const isGameMode = training.sessionMode === 'game';
     if (training.interactionMode === 'pinch_defense') {
         updatePinchDefenseTraining(now);
         return;
@@ -2087,12 +2407,42 @@ function updateTraining(now) {
     training.lastFrameAt = now;
 
     if (!appState.latestLandmarks || isHandWithdrawn(appState.latestBounds)) {
+        const gameData = training.gameData || null;
+        const shouldKeepGameTimersRunning = Boolean(
+            isGameMode
+            && training.gameRuntime
+            && gameData
+            && (gameData.resultPopup && gameData.resultPopup.visible || gameData.orderResolved || gameData.sessionComplete)
+        );
+
+        if (shouldKeepGameTimersRunning) {
+            training.gameRuntime.notifyFrame({
+                now,
+                deltaSeconds,
+                guideIndex: training.guideIndex,
+                completionPercent: getCompletionPercent(training.guideIndex),
+                holdProgress: training.holdProgress,
+                matchScore: 0,
+                result: training.lastResult || null,
+                liveLandmarks: null,
+            });
+            syncTrainingGameSnapshot(training);
+
+            if (training.gameData && training.gameData.sessionComplete) {
+                pauseTraining('leaderboard');
+                return;
+            }
+
+            updateTrainingUI();
+            return;
+        }
+
         if (!training.handLossStartedAt) {
             training.handLossStartedAt = now;
         }
 
         if (now - training.handLossStartedAt >= PAUSE_HAND_LOSS_MS) {
-            pauseTraining();
+            pauseTraining('hand_lost');
         }
 
         updateTrainingUI();
@@ -2101,9 +2451,15 @@ function updateTraining(now) {
 
     training.handLossStartedAt = 0;
 
+    if (isGameMode && training.guideIndex >= appState.guideFrames.length) {
+        training.guideIndex = 0;
+    }
+
     const guide = appState.guideFrames[Math.min(training.guideIndex, appState.guideFrames.length - 1)];
     if (!guide) {
-        finishTraining(true);
+        if (!isGameMode) {
+            finishTraining(true);
+        }
         return;
     }
 
@@ -2165,8 +2521,12 @@ function updateTraining(now) {
                 matchScore: match.score,
                 result,
             })) {
-                finishTraining(true);
-                return;
+                if (isGameMode) {
+                    training.guideIndex = 0;
+                } else {
+                    finishTraining(true);
+                    return;
+                }
             }
         }
     } else if (softMatch) {
@@ -2184,8 +2544,12 @@ function updateTraining(now) {
                 matchScore: match.score,
                 result,
             })) {
-                finishTraining(true);
-                return;
+                if (isGameMode) {
+                    training.guideIndex = 0;
+                } else {
+                    finishTraining(true);
+                    return;
+                }
             }
         }
     } else {
@@ -2200,8 +2564,12 @@ function updateTraining(now) {
                 matchScore: match.score,
                 result,
             })) {
-                finishTraining(true);
-                return;
+                if (isGameMode) {
+                    training.guideIndex = 0;
+                } else {
+                    finishTraining(true);
+                    return;
+                }
             }
         }
     }
@@ -2216,18 +2584,20 @@ function updateTraining(now) {
             holdProgress: training.holdProgress,
             matchScore: match.score,
             result,
+            liveLandmarks: appState.latestLandmarks,
         });
         syncTrainingGameSnapshot(training);
+    }
+
+    if (isGameMode && training.gameData && training.gameData.sessionComplete) {
+        pauseTraining('leaderboard');
+        return;
     }
 
     updateTrainingUI();
 }
 
 function updateTrainingUI() {
-    if (appState.screen !== 'training' && appState.screen !== 'paused') {
-        return;
-    }
-
     const training = appState.training;
     if (!training) return;
 
@@ -2240,12 +2610,9 @@ function updateTrainingUI() {
     const cueTitle = dom.screenRoot.querySelector('#trainingCueTitle');
     const cueText = dom.screenRoot.querySelector('#trainingCueText');
     const gameModeTitle = dom.screenRoot.querySelector('#trainingGameModeTitle');
-    const gamePrimaryLabel = dom.screenRoot.querySelector('#trainingGamePrimaryLabel');
-    const gamePrimaryValue = dom.screenRoot.querySelector('#trainingGamePrimaryValue');
-    const gameSecondaryLabel = dom.screenRoot.querySelector('#trainingGameSecondaryLabel');
-    const gameSecondaryValue = dom.screenRoot.querySelector('#trainingGameSecondaryValue');
-    const gameStatusText = dom.screenRoot.querySelector('#trainingGameStatusText');
-    const gameHud = training.gameHud || FALLBACK_GAME_HUD;
+
+    const gameHud         = training.gameHud || FALLBACK_GAME_HUD;
+    const gameData        = training.gameData || null;
 
     if (progressFill) progressFill.style.height = `${progressPercent}%`;
     if (progressPop) progressPop.textContent = `${progressPercent}%`;
@@ -2254,11 +2621,111 @@ function updateTrainingUI() {
     if (cueTitle) cueTitle.textContent = training.cueText;
     if (cueText) cueText.textContent = training.cueDetail;
     if (gameModeTitle) gameModeTitle.textContent = training.gameModeTitle || 'Game Mode';
-    if (gamePrimaryLabel) gamePrimaryLabel.textContent = gameHud.primaryLabel;
-    if (gamePrimaryValue) gamePrimaryValue.textContent = gameHud.primaryValue;
-    if (gameSecondaryLabel) gameSecondaryLabel.textContent = gameHud.secondaryLabel;
-    if (gameSecondaryValue) gameSecondaryValue.textContent = gameHud.secondaryValue;
-    if (gameStatusText) gameStatusText.textContent = gameHud.statusText;
+
+    // HUD score / order label
+    const elPrimaryVal   = dom.screenRoot.querySelector('#trainingGamePrimaryValue');
+    const elSecondaryVal = dom.screenRoot.querySelector('#trainingGameSecondaryValue');
+    const elStatusText   = dom.screenRoot.querySelector('#trainingGameStatusText');
+    if (elPrimaryVal)   elPrimaryVal.textContent   = gameHud.primaryValue;
+    if (elSecondaryVal) elSecondaryVal.textContent = gameHud.secondaryValue;
+    if (elStatusText)   elStatusText.textContent   = gameHud.statusText;
+
+    if (!gameData) return;
+
+    // Strengthening-game-specific DOM updates 
+
+    // Timing marker
+    const timingShell = dom.screenRoot.querySelector('#sgTimingShell');
+    const markerEl    = dom.screenRoot.querySelector('#juiceTimingMarker');
+    const trailEl     = dom.screenRoot.querySelector('#sgMarkerTrail');
+
+    if (timingShell && markerEl) {
+        const w   = timingShell.clientWidth  || 600;
+        const h   = timingShell.clientHeight || 80;
+        const pt  = getTimingMarkerPosition(gameData.markerProgress, w, h);
+        markerEl.style.left  = `${pt.x}px`;
+        markerEl.style.top   = `${pt.y}px`;
+        markerEl.dataset.zone = gameData.zoneKey || 'bad';
+        if (trailEl) trailEl.style.width = `${pt.x}px`;
+    }
+
+    // Cup fill
+    const cupFill = dom.screenRoot.querySelector('#juiceCupFill');
+    const cupVal  = dom.screenRoot.querySelector('#juiceCupValue');
+    const targetMl = Math.max(1, gameData.targetMl || 250);
+    const cupPct   = clamp((gameData.cupMl / targetMl) * 100, 0, 100);
+    if (cupFill) cupFill.style.height = `${cupPct}%`;
+    if (cupVal)  cupVal.textContent   = `${Math.round(gameData.cupMl || 0)} / ${targetMl} ml`;
+
+    // Cup card dripping class
+    const cupCard = dom.screenRoot.querySelector('#juiceTargetCard');
+    if (cupCard) cupCard.classList.toggle('is-dripping', Boolean(gameData.isSqueezing));
+
+    // Drip animations
+    const drips = dom.screenRoot.querySelectorAll('#sgDrips span');
+    drips.forEach((d) => d.classList.toggle('active', Boolean(gameData.isSqueezing && !gameData.orderResolved)));
+
+    // Order rows
+    const orderList = dom.screenRoot.querySelector('#juiceOrderList');
+    if (orderList && Array.isArray(gameData.orders)) {
+        orderList.querySelectorAll('[data-order-index]').forEach((row) => {
+            const index    = Number(row.dataset.orderIndex);
+            const order    = gameData.orders[index];
+            if (!order) return;
+            const isActive = index === gameData.activeOrderIndex;
+            const isDone   = order.status === 'done';
+            row.classList.toggle('is-active', isActive);
+            row.classList.toggle('is-muted',  !isActive && !isDone);
+            row.classList.toggle('is-done',    isDone);
+            const progEl = row.querySelector('[data-order-progress]');
+            const zoneEl = row.querySelector('[data-order-zone]');
+            if (progEl) progEl.textContent = `${Math.round(clamp(order.progress || 0, 0, 1) * 100)}%`;
+            if (zoneEl) {
+                zoneEl.textContent    = order.zoneLabel || (isActive ? 'Active' : 'Wait');
+                zoneEl.dataset.zone   = order.zoneKey || 'bad';
+            }
+        });
+    }
+
+    // Squeeze indicator
+    const squeezeEl    = dom.screenRoot.querySelector('#juiceSqueezeState');
+    const squeezeLbl   = dom.screenRoot.querySelector('#sgSqueezeLabel');
+    const intFill      = dom.screenRoot.querySelector('#sgIntFill');
+    const intLabel     = dom.screenRoot.querySelector('#sgIntLabel');
+    const isSqueezing  = Boolean(gameData.isSqueezing);
+    const intPct       = Math.round(clamp((gameData.squeezeIntensity || 0) * 100, 0, 100));
+
+    if (squeezeEl) squeezeEl.classList.toggle('is-active', isSqueezing);
+    if (squeezeLbl) squeezeLbl.textContent = isSqueezing ? `Squeezing… ${intPct}%` : 'Released';
+    if (intFill)   intFill.style.width  = `${intPct}%`;
+    if (intLabel)  intLabel.textContent = `${intPct}%`;
+
+    // Combo badge
+    const comboBadge  = dom.screenRoot.querySelector('#sgComboBadge');
+    const comboStreak = gameData.comboStreak || 0;
+    if (comboBadge) {
+        const showCombo  = comboStreak >= 2;
+        const comboLabel = comboStreak >= 3 ? '×1.5 COMBO' : '×1.2 COMBO';
+        comboBadge.classList.toggle('is-visible', showCombo);
+        comboBadge.textContent = comboLabel;
+    }
+
+    // Result popup
+    const popup       = dom.screenRoot.querySelector('#juiceResultPopup');
+    const popupTitle  = dom.screenRoot.querySelector('#juiceResultTitle');
+    const popupDetail = dom.screenRoot.querySelector('#juiceResultDetail');
+    const popupPts    = dom.screenRoot.querySelector('#juiceResultPts');
+    if (popup && gameData.resultPopup) {
+        popup.classList.toggle('is-visible', Boolean(gameData.resultPopup.visible));
+        popup.dataset.zone = gameData.resultPopup.zoneKey || 'bad';
+        if (popupTitle)  popupTitle.textContent  = gameData.resultPopup.title  || '';
+        if (popupDetail) popupDetail.textContent = gameData.resultPopup.detail || '';
+        if (popupPts) {
+            popupPts.textContent = gameData.resultPopup.pts != null
+                ? `+${gameData.resultPopup.pts} pts`
+                : '';
+        }
+    }
 }
 
 function drawOverlay() {
@@ -2382,6 +2849,21 @@ window.addEventListener('resize', () => {
 async function init() {
     render();
     await fetchExercises();
+
+    if (DEV_AUTOSTART_GAME_MODE) {
+        const exercise5Index = appState.exercises.findIndex((exercise) => exercise.id === 5);
+        if (exercise5Index >= 0 && exercise5Index !== appState.exerciseIndex) {
+            appState.exerciseIndex = exercise5Index;
+            await loadCurrentExerciseAssets();
+        }
+
+        await startCamera();
+        if (appState.cameraRunning && appState.referenceData && appState.guideFrames.length) {
+            startTrainingSession('game');
+            return;
+        }
+    }
+
     render();
 }
 

@@ -281,7 +281,7 @@
                 },
             };
         },
-
+         
         async onSessionStart(state) {
             await assetStore.ensureLoaded();
             state.hud.statusText = 'Order 1 ready — start squeezing!';
