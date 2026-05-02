@@ -14,6 +14,7 @@ from hand_compare import find_best_matching_frame, load_reference_landmarks
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
+ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 CLIPS_DIR = os.path.join(DATA_DIR, "clips")
 LANDMARKS_DIR = os.path.join(DATA_DIR, "landmarks")
 KEYFRAMES_DIR = os.path.join(DATA_DIR, "keyframes")
@@ -89,6 +90,11 @@ def index():
 @app.route("/static/<path:filename>")
 def static_files(filename):
     return send_from_directory(STATIC_DIR, filename)
+
+
+@app.route("/assets/<path:filename>")
+def asset_files(filename):
+    return send_from_directory(ASSETS_DIR, filename)
 
 
 @app.route("/api/exercises")

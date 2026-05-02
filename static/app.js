@@ -424,26 +424,26 @@ function refreshCameraStage() {
 function renderBootScreen() {
     return `
         <section class="screen boot-screen">
+            <div class="boot-backdrop" aria-hidden="true"></div>
             <div class="boot-card">
-                <div class="screen-kicker">Blueprint Recovery Flow</div>
-                <h2>Camera-Led Hand Training</h2>
+                <div class="screen-kicker">Hand Rehabilitation</div>
+                <h2>Recover your <span>hand</span></h2>
                 <p>
-                    This version replaces the old split-screen workflow with a staged experience:
-                    hand-position zones, a reference instruction view, full-screen live coaching with landmark guidance,
-                    automatic pause when the hand leaves the frame, and a session summary at the end.
+                    Begin with camera guidance in a calmer rehab setting. The system tracks your hand in real time,
+                    shows the reference exercise when needed, and keeps the recovery flow simple to follow.
                 </p>
                 <div class="boot-grid">
                     <div class="boot-stat">
-                        <strong>Navigation</strong>
-                        <span>Hold in zone for 2.5s</span>
+                        <strong>Camera Guided</strong>
+                        <span>Hands-free session flow</span>
                     </div>
                     <div class="boot-stat">
-                        <strong>Training</strong>
-                        <span>Single live camera view</span>
+                        <strong>Live Tracking</strong>
+                        <span>Landmarks respond in real time</span>
                     </div>
                     <div class="boot-stat">
-                        <strong>Guidance</strong>
-                        <span>Reference clip + live landmarks</span>
+                        <strong>Reference Support</strong>
+                        <span>Exercise cues stay close by</span>
                     </div>
                 </div>
                 <div class="button-row">
@@ -904,6 +904,7 @@ function renderSummaryScreen() {
 
 function render() {
     updateShell();
+    document.body.classList.toggle('boot-mode', appState.screen === 'boot');
 
     let html = '';
     switch (appState.screen) {

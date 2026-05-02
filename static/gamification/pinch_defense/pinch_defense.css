@@ -60,23 +60,27 @@
 }
 
 .pinch-hand-guide-shell {
-    position: absolute;
-    right: 18px;
-    bottom: 18px;
-    width: min(320px, calc(100% - 36px));
+    position: relative;
+    width: 100%;
+    max-width: 420px;
     padding: 14px;
     background: rgba(255, 255, 255, 0.92);
     box-shadow: var(--shadow);
-    z-index: 2;
+    justify-self: start;
+}
+
+.pinch-hand-guide-shell-inline {
+    margin-top: 4px;
 }
 
 .pinch-full-guide-art {
     display: block;
-    width: 100%;
+    width: min(100%, 280px);
     aspect-ratio: 1;
     object-fit: cover;
     border-radius: 18px;
     margin-top: 14px;
+    margin-inline: auto;
     box-shadow: 0 14px 28px rgba(15, 23, 42, 0.18);
 }
 
@@ -128,6 +132,10 @@
 .pinch-training-layout {
     grid-template-columns: 72px minmax(0, 1fr) minmax(240px, 290px);
     align-items: stretch;
+}
+
+.pinch-instruction-actions {
+    align-items: center;
 }
 
 .pinch-training-main {
@@ -422,12 +430,25 @@
     .pinch-side-panel {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
+
+    .pinch-hand-guide-shell {
+        max-width: 100%;
+    }
 }
 
 @media (max-width: 640px) {
     .pinch-defense-guide,
     .pinch-legend-grid {
         grid-template-columns: 1fr;
+    }
+
+    .pinch-hand-guide-shell {
+        width: 100%;
+        justify-self: stretch;
+    }
+
+    .pinch-instruction-actions {
+        align-items: stretch;
     }
 
     .pinch-hand-guide,

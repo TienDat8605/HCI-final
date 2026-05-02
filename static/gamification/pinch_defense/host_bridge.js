@@ -99,13 +99,32 @@
                                     </div>
                                 `).join('')}
                             </div>
+                        </section>
 
-                            <div class="button-row">
-                                <button class="button button-secondary" type="button" data-action="prev-exercise">Previous</button>
-                                <button class="button button-secondary" type="button" data-action="next-exercise">Next</button>
-                                <button class="button button-primary" type="button" data-action="start-training" data-zone-card="center">
-                                    Hold Center To Start
-                                </button>
+                        <section class="pinch-hand-guide-shell pinch-hand-guide-shell-inline">
+                            <div class="pinch-hand-meta">
+                                <span>Detected Hand</span>
+                                <strong id="pinchDetectedHand">${getDetectedHandLabel(handedness)}</strong>
+                            </div>
+                            <img class="pinch-full-guide-art" src="${guideAssetPath}" alt="Open hand guide for camera placement">
+                            <p class="pinch-full-guide-copy">Place the whole hand in front of the camera and keep it a little away from the lens so every fingertip stays visible.</p>
+                            ${getHandGuideMarkup(handedness)}
+                        </section>
+
+                        <div class="button-row pinch-instruction-actions">
+                            <button class="button button-secondary" type="button" data-action="prev-exercise">Previous</button>
+                            <button class="button button-secondary" type="button" data-action="next-exercise">Next</button>
+                            <button class="button button-primary" type="button" data-action="start-training" data-zone-card="center">
+                                Hold Center To Start
+                            </button>
+                        </div>
+                    </section>
+
+                    <section class="instruction-side-column">
+                        <section class="instruction-stage-shell pinch-instruction-stage">
+                            <div id="cameraMount" class="stage-mount"></div>
+                            <div class="zone-overlay">
+                                ${zoneMarkup(zoneConfig)}
                             </div>
                         </section>
 
@@ -119,24 +138,6 @@
                                 <div><strong>Ghost</strong><span>Single symbol, slow approach.</span></div>
                                 <div><strong>Slime</strong><span>Two symbols in order, release between steps.</span></div>
                                 <div><strong>Skull</strong><span>Elite 2-step target with higher score.</span></div>
-                            </div>
-                        </section>
-                    </section>
-
-                    <section class="instruction-side-column">
-                        <section class="instruction-stage-shell pinch-instruction-stage">
-                            <div id="cameraMount" class="stage-mount"></div>
-                            <div class="zone-overlay">
-                                ${zoneMarkup(zoneConfig)}
-                            </div>
-                            <div class="pinch-hand-guide-shell">
-                                <div class="pinch-hand-meta">
-                                    <span>Detected Hand</span>
-                                    <strong id="pinchDetectedHand">${getDetectedHandLabel(handedness)}</strong>
-                                </div>
-                                <img class="pinch-full-guide-art" src="${guideAssetPath}" alt="Open hand guide for camera placement">
-                                <p class="pinch-full-guide-copy">Place the whole hand in front of the camera and keep it a little away from the lens so every fingertip stays visible.</p>
-                                ${getHandGuideMarkup(handedness)}
                             </div>
                         </section>
                     </section>
